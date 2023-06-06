@@ -10,6 +10,12 @@ enum Token {
     // Operators
     Plus,
     Assign,
+    Minus,
+    Bang,
+    Asterisk,
+    Slash,
+    GreaterThan,
+    LessThan,
 
     // Delimiters
     Comma,
@@ -74,6 +80,12 @@ impl Lexer {
             ')' => Token::RightParenthesis,
             ',' => Token::Comma,
             '+' => Token::Plus,
+            '-' => Token::Minus,
+            '*' => Token::Asterisk,
+            '/' => Token::Slash,
+            '!' => Token::Bang,
+            '<' => Token::LessThan,
+            '>' => Token::GreaterThan,
             '{' => Token::LeftBrace,
             '}' => Token::RightBrace,
             EOF => Token::EOF,
@@ -139,7 +151,11 @@ mod tests {
 
     #[test]
     fn operators_delimiters() {
-        let input = "=+(){},;";
+        let input = "
+            =+(){},;
+            !-/*5;
+            5 < 10 > 5;
+        ";
 
         let expected = vec![
             Token::Assign,
@@ -149,6 +165,18 @@ mod tests {
             Token::LeftBrace,
             Token::RightBrace,
             Token::Comma,
+            Token::Semicolon,
+            Token::Bang,
+            Token::Minus,
+            Token::Slash,
+            Token::Asterisk,
+            Token::Integer(5),
+            Token::Semicolon,
+            Token::Integer(5),
+            Token::LessThan,
+            Token::Integer(10),
+            Token::GreaterThan,
+            Token::Integer(5),
             Token::Semicolon,
             Token::EOF,
         ];
@@ -162,7 +190,7 @@ mod tests {
     }
 
     #[test]
-    fn identifiers_keywords_numbers() {
+    fn identifiers_keywords_integers() {
         let input = "
             let five = 5;
             let ten = 10;
