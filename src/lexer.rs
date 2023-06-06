@@ -16,6 +16,8 @@ enum Token {
     Slash,
     GreaterThan,
     LessThan,
+    Equal,
+    NotEqual,
 
     // Delimiters
     Comma,
@@ -71,6 +73,20 @@ impl Lexer {
         lexer
     }
 
+    fn handle_peek(
+        &mut self,
+        expected_char: char,
+        token_if_true: Token,
+        token_if_false: Token,
+    ) -> Token {
+        if self.peek_char() == expected_char {
+            self.read_char();
+            token_if_true
+        } else {
+            token_if_false
+        }
+    }
+
     fn next_token(&mut self) -> Token {
         while self.current_char.is_whitespace() {
             self.read_char();
@@ -79,7 +95,7 @@ impl Lexer {
         let mut read_next_char = true;
 
         let token = match self.current_char {
-            '=' => Token::Assign,
+            '=' => self.handle_peek('=', Token::Equal, Token::Assign),
             ';' => Token::Semicolon,
             '(' => Token::LeftParenthesis,
             ')' => Token::RightParenthesis,
@@ -88,7 +104,7 @@ impl Lexer {
             '-' => Token::Minus,
             '*' => Token::Asterisk,
             '/' => Token::Slash,
-            '!' => Token::Bang,
+            '!' => self.handle_peek('=', Token::NotEqual, Token::Bang),
             '<' => Token::LessThan,
             '>' => Token::GreaterThan,
             '{' => Token::LeftBrace,
@@ -153,11 +169,33 @@ impl Lexer {
             .parse::<i64>()
             .expect("Error parsing integer")
     }
+
+    fn peek_char(&self) -> char {
+        if self.read_position >= self.input.len() {
+            EOF
+        } else {
+            self.input
+                .chars()
+                .nth(self.read_position)
+                .expect("Error reading character")
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    macro_rules! assert_lexer_eq {
+        ($input:expr, $expected:expr) => {
+            let mut lexer = Lexer::new($input.to_string());
+
+            for expected_token in $expected {
+                let token = lexer.next_token();
+                assert_eq!(token, expected_token);
+            }
+        };
+    }
 
     #[test]
     fn operators_delimiters() {
@@ -191,12 +229,7 @@ mod tests {
             Token::EOF,
         ];
 
-        let mut lexer = Lexer::new(input.to_string());
-
-        for expected_token in expected {
-            let token = lexer.next_token();
-            assert_eq!(token, expected_token);
-        }
+        assert_lexer_eq!(input, expected);
     }
 
     #[test]
@@ -249,12 +282,7 @@ mod tests {
             Token::Semicolon,
         ];
 
-        let mut lexer = Lexer::new(input.to_string());
-
-        for expected_token in expected {
-            let token = lexer.next_token();
-            assert_eq!(token, expected_token);
-        }
+        assert_lexer_eq!(input, expected);
     }
 
     #[test]
@@ -287,11 +315,27 @@ mod tests {
             Token::RightBrace,
         ];
 
-        let mut lexer = Lexer::new(input.to_string());
+        assert_lexer_eq!(input, expected);
+    }
 
-        for expected_token in expected {
-            let token = lexer.next_token();
-            assert_eq!(token, expected_token);
-        }
+    #[test]
+    fn comparisons() {
+        let input = "
+            10 == 10;
+            10 != 9;
+        ";
+
+        let expected = vec![
+            Token::Integer(10),
+            Token::Equal,
+            Token::Integer(10),
+            Token::Semicolon,
+            Token::Integer(10),
+            Token::NotEqual,
+            Token::Integer(9),
+            Token::Semicolon,
+        ];
+
+        assert_lexer_eq!(input, expected);
     }
 }
