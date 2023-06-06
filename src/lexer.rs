@@ -1,5 +1,5 @@
 #[derive(Debug, PartialEq)]
-enum Token {
+pub enum Token {
     // Illegal and end of file
     Illegal,
     EOF,
@@ -37,7 +37,7 @@ enum Token {
     Return,
 }
 
-struct Lexer {
+pub struct Lexer {
     input: String,
     position: usize,
     read_position: usize,
@@ -62,7 +62,7 @@ impl Lexer {
         self.read_position += 1;
     }
 
-    fn new(input: String) -> Self {
+    pub fn new(input: String) -> Self {
         let mut lexer = Self {
             input,
             position: 0,
@@ -87,7 +87,7 @@ impl Lexer {
         }
     }
 
-    fn next_token(&mut self) -> Token {
+    pub fn next_token(&mut self) -> Token {
         while self.current_char.is_whitespace() {
             self.read_char();
         }
