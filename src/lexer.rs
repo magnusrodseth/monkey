@@ -28,6 +28,11 @@ enum Token {
     // Keywords
     Function,
     Let,
+    True,
+    False,
+    If,
+    Else,
+    Return,
 }
 
 struct Lexer {
@@ -123,6 +128,11 @@ impl Lexer {
         match identifier.as_str() {
             "fn" => Token::Function,
             "let" => Token::Let,
+            "true" => Token::True,
+            "false" => Token::False,
+            "if" => Token::If,
+            "else" => Token::Else,
+            "return" => Token::Return,
             _ => Token::Identifier(identifier),
         }
     }
@@ -237,6 +247,44 @@ mod tests {
             Token::Identifier(String::from("ten")),
             Token::RightParenthesis,
             Token::Semicolon,
+        ];
+
+        let mut lexer = Lexer::new(input.to_string());
+
+        for expected_token in expected {
+            let token = lexer.next_token();
+            assert_eq!(token, expected_token);
+        }
+    }
+
+    #[test]
+    fn if_else() {
+        let input = "
+            if (5 < 10) {
+                return true;
+            } else {
+                return false;
+            }
+        ";
+
+        let expected = vec![
+            Token::If,
+            Token::LeftParenthesis,
+            Token::Integer(5),
+            Token::LessThan,
+            Token::Integer(10),
+            Token::RightParenthesis,
+            Token::LeftBrace,
+            Token::Return,
+            Token::True,
+            Token::Semicolon,
+            Token::RightBrace,
+            Token::Else,
+            Token::LeftBrace,
+            Token::Return,
+            Token::False,
+            Token::Semicolon,
+            Token::RightBrace,
         ];
 
         let mut lexer = Lexer::new(input.to_string());
