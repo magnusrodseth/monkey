@@ -117,6 +117,23 @@ mod tests {
     use super::*;
     use crate::ast::LetStatement;
 
+    macro_rules! assert_let_statement_eq {
+        ($let_statement:expr, $expected_identifier:expr) => {
+            assert_eq!($let_statement.token(), Token::Let);
+
+            // Cast the statement to any and then downcast to LetStatement
+            if let Some(let_statement) = $let_statement.as_any().downcast_ref::<LetStatement>() {
+                assert_eq!(let_statement.name.value, $expected_identifier.to_string());
+                assert_eq!(
+                    let_statement.name.token,
+                    Token::Identifier($expected_identifier.to_string())
+                );
+            } else {
+                panic!("Expected let statement, got something else");
+            }
+        };
+    }
+
     #[test]
     fn let_statement() {
         let input = "
@@ -139,18 +156,7 @@ mod tests {
 
                 for (i, expected_identifier) in expected_identifiers.iter().enumerate() {
                     let statement = &program.statements[i];
-                    assert_eq!(statement.token(), Token::Let);
-
-                    // Cast the statement to any and then downcast to LetStatement
-                    if let Some(let_statement) = statement.as_any().downcast_ref::<LetStatement>() {
-                        assert_eq!(let_statement.name.value, expected_identifier.to_string());
-                        assert_eq!(
-                            let_statement.name.token,
-                            Token::Identifier(expected_identifier.to_string())
-                        );
-                    } else {
-                        panic!("Did not get let statement");
-                    }
+                    assert_let_statement_eq!(statement, expected_identifier);
                 }
             }
         }
