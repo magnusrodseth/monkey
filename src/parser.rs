@@ -69,11 +69,6 @@ impl Parser {
             infix_parse_fns: HashMap::new(),
         };
 
-        parser.add_prefix(
-            Token::Identifier(String::new()),
-            Box::new(|parser| parser.parse_identifier()),
-        );
-
         // Read two tokens, such that both `current_token` and `peek_token` are set
         parser.next_token();
         parser.next_token();
@@ -122,19 +117,8 @@ impl Parser {
         }
     }
 
-    fn parse_identifier(&mut self) -> Result<Box<dyn Expression>, ParserError> {
-        Ok(Box::new(Identifier {
-            token: self.current_token.clone(),
-            value: if let Token::Identifier(value) = self.current_token.clone() {
-                value
-            } else {
-                return Err(ParserError::new("Expected identifier".to_string()));
-            },
-        }))
-    }
-
     fn parse_let_statement(&mut self) -> Result<Box<dyn Statement>, ParserError> {
-        let statement_token = self.current_token.clone();
+        let token = self.current_token.clone();
 
         // Peek the value of the upcoming identifier. If this fails, then the let statement is invalid.
         let identifier_token = if let Token::Identifier(value) = self.peek_token.clone() {
@@ -168,7 +152,7 @@ impl Parser {
         }
 
         Ok(Box::new(LetStatement {
-            token: statement_token,
+            token,
             name: identifier,
             // TODO: Parse expressions
             value: None,
@@ -193,7 +177,7 @@ impl Parser {
     }
 
     fn parse_return_statement(&mut self) -> Result<Box<dyn Statement>, ParserError> {
-        let statement_token = self.current_token.clone();
+        let token = self.current_token.clone();
 
         self.next_token();
 
@@ -203,7 +187,7 @@ impl Parser {
         }
 
         Ok(Box::new(ReturnStatement {
-            token: statement_token,
+            token,
             // TODO: Pars expresion
             return_value: None,
         }))
@@ -218,18 +202,14 @@ impl Parser {
     }
 
     fn parse_expression_statement(&mut self) -> Result<Box<dyn Statement>, ParserError> {
-        let statement_token = self.current_token.clone();
-
+        let token = self.current_token.clone();
         let expression = self.parse_expression(Precedence::Lowest);
 
         if self.peek_token_is(&Token::Semicolon) {
             self.next_token();
         }
 
-        Ok(Box::new(ExpressionStatement {
-            token: statement_token,
-            expression,
-        }))
+        Ok(Box::new(ExpressionStatement { token, expression }))
     }
 
     fn parse_expression(&self, precedence: Precedence) -> Option<Box<dyn Expression>> {
@@ -242,8 +222,7 @@ impl Parser {
         let function = prefix.expect(
             "Prefix function should be present, since we checked for it's presence earlier",
         );
-
-        return function();
+        None
     }
 }
 
