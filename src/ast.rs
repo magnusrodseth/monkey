@@ -177,7 +177,7 @@ impl Node for IntegerLiteral {
 
 pub struct PrefixExpression {
     pub token: Token,
-    pub right: Option<Box<dyn Expression>>,
+    pub right: Box<dyn Expression>,
 }
 
 impl Expression for PrefixExpression {
@@ -197,7 +197,7 @@ impl Node for PrefixExpression {
         format!(
             "({}{})",
             self.token.to_string(),
-            self.right.as_ref().expect("No right found").to_string()
+            self.right.as_ref().to_string()
         )
     }
 }

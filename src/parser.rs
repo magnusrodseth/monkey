@@ -1,4 +1,4 @@
-use std::{cell::RefCell, collections::HashMap, error::Error, fmt::Display};
+use std::{collections::HashMap, error::Error, fmt::Display};
 
 use crate::{
     ast::{
@@ -45,17 +45,11 @@ impl ParserError {
     }
 }
 
-type PrefixParseFn = dyn Fn(&Parser) -> Option<Box<dyn Expression>>;
-type InfixParseFn = dyn Fn(&Parser, Box<dyn Expression>) -> Option<Box<dyn Expression>>;
-
 struct Parser {
     lexer: Lexer,
     current_token: Token,
     peek_token: Token,
     errors: Vec<ParserError>,
-
-    prefix_parse_fns: HashMap<Token, Box<PrefixParseFn>>,
-    infix_parse_fns: HashMap<Token, Box<InfixParseFn>>,
 }
 
 impl Parser {
@@ -65,20 +59,7 @@ impl Parser {
             current_token: Token::EOF,
             peek_token: Token::EOF,
             errors: Vec::new(),
-            prefix_parse_fns: HashMap::new(),
-            infix_parse_fns: HashMap::new(),
         };
-
-        parser.add_prefix(
-            Token::Identifier("".to_string()),
-            Box::new(|parser| parser.parse_identifier()),
-        );
-        parser.add_prefix(
-            Token::Integer(0),
-            Box::new(|parser| parser.parse_integer_literal()),
-        );
-        parser.add_prefix(Token::Bang, Box::new(|parser| parser.parse_prefix()));
-        parser.add_prefix(Token::Minus, Box::new(|parser| parser.parse_prefix()));
 
         // Read two tokens, such that both `current_token` and `peek_token` are set
         parser.next_token();
@@ -215,34 +196,40 @@ impl Parser {
         }))
     }
 
-    fn add_prefix(&mut self, token: Token, function: Box<PrefixParseFn>) {
-        self.prefix_parse_fns.insert(token, function);
-    }
-
-    fn add_infix(&mut self, token: Token, function: Box<InfixParseFn>) {
-        self.infix_parse_fns.insert(token, function);
-    }
-
     fn parse_expression_statement(&mut self) -> Result<Box<dyn Statement>, ParserError> {
-        let token = self.current_token.clone();
         let expression = self.parse_expression(Precedence::Lowest);
 
-        if self.peek_token_is(&Token::Semicolon) {
-            self.next_token();
-        }
+        match expression {
+            Some(expression) => {
+                if self.peek_token_is(&Token::Semicolon) {
+                    self.next_token();
+                }
 
-        Ok(Box::new(ExpressionStatement { token, expression }))
+                Ok(Box::new(ExpressionStatement {
+                    token: self.current_token.clone(),
+                    expression: Some(expression),
+                }))
+            }
+            None => Err(ParserError::new(
+                format!("Expected expression, got {}", self.current_token).into(),
+            )),
+        }
     }
 
-    fn parse_expression(&self, precedence: Precedence) -> Option<Box<dyn Expression>> {
-        let prefix = self.prefix_parse_fns.get(&self.current_token);
+    fn parse_expression(&mut self, precedence: Precedence) -> Option<Box<dyn Expression>> {
+        let left = match self.current_token {
+            Token::Integer(_) => self.parse_integer_literal(),
+            Token::Identifier(_) => self.parse_identifier(),
+            Token::Bang | Token::Minus => self.parse_prefix(),
+            _ => {
+                self.errors.push(ParserError::new(
+                    format!("No prefix parse function for {}", self.current_token).into(),
+                ));
+                None
+            }
+        };
 
-        if prefix.is_none() {
-            return None;
-        }
-
-        let left_expression = prefix.expect("Prefix function has already been checked")(self);
-        return left_expression;
+        left
     }
 
     fn parse_integer_literal(&self) -> Option<Box<dyn Expression>> {
@@ -257,15 +244,18 @@ impl Parser {
         Some(Box::new(IntegerLiteral { token, value }))
     }
 
-    fn parse_prefix(&self) -> Option<Box<dyn Expression>> {
-        let token = self.current_token.clone();
-
-        // TODO: We get stack overflow if we don't advance, and we cannot compile if we do.
-        // self.next_token();
+    fn parse_prefix(&mut self) -> Option<Box<dyn Expression>> {
+        self.next_token();
 
         let right = self.parse_expression(Precedence::Prefix);
 
-        Some(Box::new(PrefixExpression { token, right }))
+        match right {
+            Some(right) => Some(Box::new(PrefixExpression {
+                token: self.current_token.clone(),
+                right,
+            })),
+            None => None,
+        }
     }
 }
 
@@ -468,11 +458,9 @@ mod tests {
                         let expression = cast_into!(statement, ExpressionStatement);
                         if let Some(expression) = &expression.expression {
                             let prefix = cast_into!(expression, PrefixExpression);
-                            if let Some(integer) = &prefix.right {
-                                let integer = cast_into!(integer, IntegerLiteral);
-                                assert_eq!(integer.value, test.integer_value);
-                                assert_eq!(integer.token, Token::Integer(test.integer_value));
-                            }
+                            let integer = cast_into!(prefix.right, IntegerLiteral);
+                            assert_eq!(integer.value, test.integer_value);
+                            assert_eq!(integer.token, Token::Integer(test.integer_value));
                         }
                     } else {
                         panic!("Expected statement, got something else");
