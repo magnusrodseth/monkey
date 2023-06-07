@@ -1,8 +1,9 @@
 use repl::Repl;
 
-mod lexer;
-mod repl;
 mod ast;
+mod lexer;
+mod parser;
+mod repl;
 
 fn main() {
     Repl::start();

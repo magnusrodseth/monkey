@@ -1,19 +1,22 @@
+use std::any::Any;
+
 use crate::lexer::Token;
 
-trait Node {
+pub trait Node: Any {
     fn token(&self) -> Token;
+    fn as_any(&self) -> &dyn Any;
 }
 
-trait Statement: Node {
+pub trait Statement: Node {
     fn statement_node(&self);
 }
 
-trait Expression: Node {
+pub trait Expression: Node {
     fn expression_node(&self);
 }
 
-struct Program {
-    statements: Vec<Box<dyn Statement>>,
+pub struct Program {
+    pub statements: Vec<Box<dyn Statement>>,
 }
 
 impl Node for Program {
@@ -24,11 +27,15 @@ impl Node for Program {
             Token::EOF
         }
     }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 }
 
-struct Identifier {
-    token: Token,
-    value: String,
+pub struct Identifier {
+    pub token: Token,
+    pub value: String,
 }
 
 impl Expression for Identifier {
@@ -41,12 +48,16 @@ impl Node for Identifier {
     fn token(&self) -> Token {
         self.token.clone()
     }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 }
 
-struct LetStatement {
-    token: Token,
-    name: Identifier,
-    value: Box<dyn Expression>,
+pub struct LetStatement {
+    pub token: Token,
+    pub name: Identifier,
+    pub value: Option<Box<dyn Expression>>,
 }
 
 impl Statement for LetStatement {
@@ -58,5 +69,9 @@ impl Statement for LetStatement {
 impl Node for LetStatement {
     fn token(&self) -> Token {
         self.token.clone()
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
     }
 }
