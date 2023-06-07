@@ -45,8 +45,8 @@ impl ParserError {
     }
 }
 
-type PrefixParseFn = dyn Fn(&mut Parser) -> Result<Box<dyn Expression>, ParserError>;
-type InfixParseFn = dyn Fn(&mut Parser, Box<dyn Expression>) -> Option<Box<dyn Expression>>;
+type PrefixParseFn = dyn Fn(&Parser) -> Option<Box<dyn Expression>>;
+type InfixParseFn = dyn Fn(Box<dyn Expression>) -> Option<Box<dyn Expression>>;
 
 struct Parser {
     lexer: Lexer,
@@ -68,6 +68,11 @@ impl Parser {
             prefix_parse_fns: HashMap::new(),
             infix_parse_fns: HashMap::new(),
         };
+
+        parser.add_prefix(
+            Token::Identifier("".to_string()),
+            Box::new(|parser| parser.parse_identifier()),
+        );
 
         // Read two tokens, such that both `current_token` and `peek_token` are set
         parser.next_token();
@@ -107,6 +112,17 @@ impl Parser {
         }
 
         Ok(program)
+    }
+
+    fn parse_identifier(&self) -> Option<Box<dyn Expression>> {
+        Some(Box::new(Identifier {
+            token: self.current_token.clone(),
+            value: if let Token::Identifier(value) = self.current_token.clone() {
+                value
+            } else {
+                return None;
+            },
+        }))
     }
 
     fn parse_statement(&mut self) -> Result<Box<dyn Statement>, ParserError> {
@@ -212,17 +228,16 @@ impl Parser {
         Ok(Box::new(ExpressionStatement { token, expression }))
     }
 
-    fn parse_expression(&self, precedence: Precedence) -> Option<Box<dyn Expression>> {
+    fn parse_expression(&mut self, precedence: Precedence) -> Option<Box<dyn Expression>> {
         let prefix = self.prefix_parse_fns.get(&self.current_token);
 
         if prefix.is_none() {
             return None;
         }
 
-        let function = prefix.expect(
-            "Prefix function should be present, since we checked for it's presence earlier",
-        );
-        None
+        let function = prefix.expect("Prefix function has already been checked")(self);
+
+        return function;
     }
 }
 
@@ -352,8 +367,6 @@ mod tests {
                         let identifier = cast_into!(expr, Identifier);
                         assert_eq!(identifier.value, "foobar");
                         assert_eq!(identifier.token, Token::Identifier("foobar".into()));
-                    } else {
-                        panic!("Expected expression, got something else");
                     }
                 } else {
                     panic!("Expected statement, got something else");

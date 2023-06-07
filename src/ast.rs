@@ -1,3 +1,4 @@
+use core::fmt;
 use std::any::Any;
 
 use crate::token::Token;
@@ -44,6 +45,7 @@ impl Node for Program {
     }
 }
 
+#[derive(Debug)]
 pub struct Identifier {
     pub token: Token,
     pub value: String,
@@ -72,7 +74,6 @@ impl Node for Identifier {
 pub struct LetStatement {
     pub token: Token,
     pub name: Identifier,
-    // TODO: Remove option after implementing expressions
     pub value: Option<Box<dyn Expression>>,
 }
 
@@ -103,7 +104,6 @@ impl Node for LetStatement {
 
 pub struct ReturnStatement {
     pub token: Token,
-    // TODO: Remove option after implementing expressions
     pub return_value: Option<Box<dyn Expression>>,
 }
 
@@ -133,7 +133,6 @@ impl Node for ReturnStatement {
 
 pub struct ExpressionStatement {
     pub token: Token,
-    // TODO: Remove option after implementing expressions
     pub expression: Option<Box<dyn Expression>>,
 }
 
