@@ -1,10 +1,30 @@
 use std::{collections::HashMap, error::Error, fmt::Display};
 
 use crate::{
-    ast::{Expression, Identifier, LetStatement, Program, ReturnStatement, Statement},
+    ast::{
+        Expression, ExpressionStatement, Identifier, LetStatement, Program, ReturnStatement,
+        Statement,
+    },
     lexer::Lexer,
     token::Token,
 };
+
+#[derive(Debug, PartialEq, Eq)]
+enum Precedence {
+    Lowest,
+    /// ==
+    Equals,
+    /// > or <
+    LessThanOrGreaterThan,
+    /// +
+    Sum,
+    /// *
+    Product,
+    /// -X or !X
+    Prefix,
+    /// myFunction(X)
+    Call,
+}
 
 #[derive(Debug, Clone)]
 struct ParserError {
@@ -25,8 +45,8 @@ impl ParserError {
     }
 }
 
-type PrefixParseFn = dyn Fn() -> Option<Box<dyn Expression>>;
-type InfixParseFn = dyn Fn(Box<dyn Expression>) -> Option<Box<dyn Expression>>;
+type PrefixParseFn = dyn Fn(&mut Parser) -> Result<Box<dyn Expression>, ParserError>;
+type InfixParseFn = dyn Fn(&mut Parser, Box<dyn Expression>) -> Option<Box<dyn Expression>>;
 
 struct Parser {
     lexer: Lexer,
@@ -48,6 +68,11 @@ impl Parser {
             prefix_parse_fns: HashMap::new(),
             infix_parse_fns: HashMap::new(),
         };
+
+        parser.add_prefix(
+            Token::Identifier(String::new()),
+            Box::new(|parser| parser.parse_identifier()),
+        );
 
         // Read two tokens, such that both `current_token` and `peek_token` are set
         parser.next_token();
@@ -93,8 +118,19 @@ impl Parser {
         match self.current_token {
             Token::Let => self.parse_let_statement(),
             Token::Return => self.parse_return_statement(),
-            _ => todo!(),
+            _ => self.parse_expression_statement(),
         }
+    }
+
+    fn parse_identifier(&mut self) -> Result<Box<dyn Expression>, ParserError> {
+        Ok(Box::new(Identifier {
+            token: self.current_token.clone(),
+            value: if let Token::Identifier(value) = self.current_token.clone() {
+                value
+            } else {
+                return Err(ParserError::new("Expected identifier".to_string()));
+            },
+        }))
     }
 
     fn parse_let_statement(&mut self) -> Result<Box<dyn Statement>, ParserError> {
@@ -179,6 +215,35 @@ impl Parser {
 
     fn add_infix(&mut self, token: Token, function: Box<InfixParseFn>) {
         self.infix_parse_fns.insert(token, function);
+    }
+
+    fn parse_expression_statement(&mut self) -> Result<Box<dyn Statement>, ParserError> {
+        let statement_token = self.current_token.clone();
+
+        let expression = self.parse_expression(Precedence::Lowest);
+
+        if self.peek_token_is(&Token::Semicolon) {
+            self.next_token();
+        }
+
+        Ok(Box::new(ExpressionStatement {
+            token: statement_token,
+            expression,
+        }))
+    }
+
+    fn parse_expression(&self, precedence: Precedence) -> Option<Box<dyn Expression>> {
+        let prefix = self.prefix_parse_fns.get(&self.current_token);
+
+        if prefix.is_none() {
+            return None;
+        }
+
+        let function = prefix.expect(
+            "Prefix function should be present, since we checked for it's presence earlier",
+        );
+
+        return function();
     }
 }
 
