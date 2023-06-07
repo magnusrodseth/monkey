@@ -4,6 +4,7 @@ use crate::token::Token;
 
 pub trait Node: Any {
     fn token(&self) -> Token;
+    fn to_string(&self) -> String;
     fn as_any(&self) -> &dyn Any;
 }
 
@@ -31,6 +32,16 @@ impl Node for Program {
     fn as_any(&self) -> &dyn Any {
         self
     }
+
+    fn to_string(&self) -> String {
+        let mut output = String::new();
+
+        for statement in self.statements.iter() {
+            output.push_str(&statement.to_string());
+        }
+
+        output
+    }
 }
 
 pub struct Identifier {
@@ -51,6 +62,10 @@ impl Node for Identifier {
 
     fn as_any(&self) -> &dyn Any {
         self
+    }
+
+    fn to_string(&self) -> String {
+        self.value.clone()
     }
 }
 
@@ -75,6 +90,15 @@ impl Node for LetStatement {
     fn as_any(&self) -> &dyn Any {
         self
     }
+
+    fn to_string(&self) -> String {
+        format!(
+            "{} {} = {};",
+            self.token.to_string().to_lowercase(),
+            self.name.to_string(),
+            self.value.as_ref().expect("No value found").to_string()
+        )
+    }
 }
 
 pub struct ReturnStatement {
@@ -96,5 +120,67 @@ impl Node for ReturnStatement {
 
     fn as_any(&self) -> &dyn Any {
         self
+    }
+
+    fn to_string(&self) -> String {
+        if let Some(return_value) = &self.return_value {
+            format!("{} {};", self.token, return_value.to_string())
+        } else {
+            format!("{};", self.token)
+        }
+    }
+}
+
+pub struct ExpressionStatement {
+    pub token: Token,
+    // TODO: Remove option after implementing expressions
+    pub expression: Option<Box<dyn Expression>>,
+}
+
+impl Statement for ExpressionStatement {
+    fn statement_node(&self) {
+        todo!()
+    }
+}
+
+impl Node for ExpressionStatement {
+    fn token(&self) -> Token {
+        self.token.clone()
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn to_string(&self) -> String {
+        if let Some(expression) = &self.expression {
+            expression.to_string()
+        } else {
+            "".into()
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ast_to_string() {
+        let program = Program {
+            statements: vec![Box::new(LetStatement {
+                token: Token::Let,
+                name: Identifier {
+                    token: Token::Identifier("myVar".into()),
+                    value: "myVar".into(),
+                },
+                value: Some(Box::new(Identifier {
+                    token: Token::Identifier("anotherVar".into()),
+                    value: "anotherVar".into(),
+                })),
+            })],
+        };
+
+        assert_eq!(program.to_string(), "let myVar = anotherVar;");
     }
 }
