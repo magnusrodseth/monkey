@@ -258,14 +258,14 @@ impl Parser {
     }
 
     fn parse_prefix(&self) -> Option<Box<dyn Expression>> {
-        // let token = self.current_token.clone();
-        //
+        let token = self.current_token.clone();
+
+        // TODO: We get stack overflow if we don't advance, and we cannot compile if we do.
         // self.next_token();
-        //
-        // let right = self.parse_expression(Precedence::Prefix);
-        //
-        // Some(Box::new(PrefixExpression { token, right }))
-        todo!()
+
+        let right = self.parse_expression(Precedence::Prefix);
+
+        Some(Box::new(PrefixExpression { token, right }))
     }
 }
 
