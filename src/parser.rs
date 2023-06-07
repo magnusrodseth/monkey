@@ -1,7 +1,7 @@
-use std::{error::Error, fmt::Display};
+use std::{collections::HashMap, error::Error, fmt::Display};
 
 use crate::{
-    ast::{Identifier, LetStatement, Program, ReturnStatement, Statement},
+    ast::{Expression, Identifier, LetStatement, Program, ReturnStatement, Statement},
     lexer::Lexer,
     token::Token,
 };
@@ -25,11 +25,17 @@ impl ParserError {
     }
 }
 
+type PrefixParseFn = dyn Fn() -> Option<Box<dyn Expression>>;
+type InfixParseFn = dyn Fn(Box<dyn Expression>) -> Option<Box<dyn Expression>>;
+
 struct Parser {
     lexer: Lexer,
     current_token: Token,
     peek_token: Token,
     errors: Vec<ParserError>,
+
+    prefix_parse_fns: HashMap<Token, Box<PrefixParseFn>>,
+    infix_parse_fns: HashMap<Token, Box<InfixParseFn>>,
 }
 
 impl Parser {
@@ -39,6 +45,8 @@ impl Parser {
             current_token: Token::EOF,
             peek_token: Token::EOF,
             errors: Vec::new(),
+            prefix_parse_fns: HashMap::new(),
+            infix_parse_fns: HashMap::new(),
         };
 
         // Read two tokens, such that both `current_token` and `peek_token` are set
@@ -164,27 +172,46 @@ impl Parser {
             return_value: None,
         }))
     }
+
+    fn add_prefix(&mut self, token: Token, function: Box<PrefixParseFn>) {
+        self.prefix_parse_fns.insert(token, function);
+    }
+
+    fn add_infix(&mut self, token: Token, function: Box<InfixParseFn>) {
+        self.infix_parse_fns.insert(token, function);
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ast::{LetStatement, ReturnStatement};
+    use crate::ast::{ExpressionStatement, LetStatement, ReturnStatement};
+
+    /// Casts an expression into a specific type, panicking if the cast fails.
+    macro_rules! cast_into {
+        ($expr:expr, $expected_type:ty) => {
+            if let Some(expr) = $expr.as_any().downcast_ref::<$expected_type>() {
+                expr
+            } else {
+                panic!(
+                    "Expected {}, got something else",
+                    stringify!($expected_type)
+                );
+            }
+        };
+    }
 
     macro_rules! assert_let_statement_eq {
         ($let_statement:expr, $expected_identifier:expr) => {
             assert_eq!($let_statement.token(), Token::Let);
 
             // Cast the statement to any and then downcast
-            if let Some(let_statement) = $let_statement.as_any().downcast_ref::<LetStatement>() {
-                assert_eq!(let_statement.name.value, $expected_identifier.to_string());
-                assert_eq!(
-                    let_statement.name.token,
-                    Token::Identifier($expected_identifier.to_string())
-                );
-            } else {
-                panic!("Expected let statement, got something else");
-            }
+            let let_statement = cast_into!($let_statement, LetStatement);
+            assert_eq!(let_statement.name.value, $expected_identifier.to_string());
+            assert_eq!(
+                let_statement.name.token,
+                Token::Identifier($expected_identifier.to_string())
+            );
         };
     }
 
@@ -193,13 +220,8 @@ mod tests {
             assert_eq!($return_statement.token(), Token::Return);
 
             // Cast the statement to any and then downcast
-            if let Some(return_statement) =
-                $return_statement.as_any().downcast_ref::<ReturnStatement>()
-            {
-                assert_eq!(return_statement.token, Token::Return);
-            } else {
-                panic!("Expected return statement, got something else");
-            }
+            let return_statement = cast_into!($return_statement, ReturnStatement);
+            assert_eq!(return_statement.token, Token::Return);
         };
     }
 
@@ -261,6 +283,36 @@ mod tests {
 
                 for statement in program.statements {
                     assert_return_statement_eq!(statement);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn identifier_as_expression() {
+        let input = "foobar;";
+        let lexer = Lexer::new(input.into());
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse();
+
+        match program {
+            Err(_) => {
+                handle_parser_errors!(parser.errors());
+            }
+            Ok(program) => {
+                assert_eq!(program.statements.len(), 1);
+
+                if let Some(statement) = program.statements.first() {
+                    let expression = cast_into!(statement, ExpressionStatement);
+                    if let Some(expr) = &expression.expression {
+                        let identifier = cast_into!(expr, Identifier);
+                        assert_eq!(identifier.value, "foobar");
+                        assert_eq!(identifier.token, Token::Identifier("foobar".into()));
+                    } else {
+                        panic!("Expected expression, got something else");
+                    }
+                } else {
+                    panic!("Expected statement, got something else");
                 }
             }
         }
