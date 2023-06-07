@@ -1,41 +1,4 @@
-#[derive(Debug, PartialEq, Clone)]
-pub enum Token {
-    // Illegal and end of file
-    Illegal,
-    EOF,
-    // Identifiers and literals
-    Identifier(String),
-    Integer(i64),
-
-    // Operators
-    Plus,
-    Assign,
-    Minus,
-    Bang,
-    Asterisk,
-    Slash,
-    GreaterThan,
-    LessThan,
-    Equal,
-    NotEqual,
-
-    // Delimiters
-    Comma,
-    Semicolon,
-    LeftParenthesis,
-    RightParenthesis,
-    LeftBrace,
-    RightBrace,
-
-    // Keywords
-    Function,
-    Let,
-    True,
-    False,
-    If,
-    Else,
-    Return,
-}
+use crate::token::Token;
 
 pub struct Lexer {
     input: String,

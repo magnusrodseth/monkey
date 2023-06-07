@@ -1,14 +1,35 @@
-use std::fmt::Error;
+use std::{error::Error, fmt::Display};
 
 use crate::{
     ast::{Identifier, LetStatement, Program, Statement},
-    lexer::{Lexer, Token},
+    lexer::Lexer,
+    token::Token,
 };
+
+#[derive(Debug, Clone)]
+struct ParserError {
+    message: String,
+}
+
+impl Error for ParserError {}
+
+impl Display for ParserError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:#?}", self.message)
+    }
+}
+
+impl ParserError {
+    fn new(message: String) -> Self {
+        Self { message }
+    }
+}
 
 struct Parser {
     lexer: Lexer,
     current_token: Token,
     peek_token: Token,
+    errors: Vec<ParserError>,
 }
 
 impl Parser {
@@ -17,6 +38,7 @@ impl Parser {
             lexer,
             current_token: Token::EOF,
             peek_token: Token::EOF,
+            errors: Vec::new(),
         };
 
         // Read two tokens, such that both `current_token` and `peek_token` are set
@@ -26,17 +48,28 @@ impl Parser {
         parser
     }
 
+    fn errors(&self) -> Vec<ParserError> {
+        self.errors.clone()
+    }
+
+    fn peek_error(&mut self, token: Token) {
+        self.errors.push(ParserError::new(format!(
+            "Expected next token to be {:?}, got {:?}",
+            token, self.peek_token
+        )));
+    }
+
     fn next_token(&mut self) {
         self.current_token = self.peek_token.clone();
         self.peek_token = self.lexer.next_token();
     }
 
-    fn parse(&mut self) -> Result<Program, Error> {
+    fn parse(&mut self) -> Result<Program, ParserError> {
         let mut program = Program {
             statements: Vec::new(),
         };
 
-        while self.current_token != Token::EOF {
+        while !self.current_token_is(Token::EOF) {
             match self.parse_statement() {
                 Ok(statement) => program.statements.push(statement),
                 Err(error) => return Err(error),
@@ -48,25 +81,25 @@ impl Parser {
         Ok(program)
     }
 
-    fn parse_statement(&mut self) -> Result<Box<dyn Statement>, Error> {
+    fn parse_statement(&mut self) -> Result<Box<dyn Statement>, ParserError> {
         match self.current_token {
             Token::Let => self.parse_let_statement(),
             _ => todo!(),
         }
     }
 
-    fn parse_let_statement(&mut self) -> Result<Box<dyn Statement>, Error> {
+    fn parse_let_statement(&mut self) -> Result<Box<dyn Statement>, ParserError> {
         let statement_token = self.current_token.clone();
 
         // Peek the value of the upcoming identifier. If this fails, then the let statement is invalid.
         let identifier_token = if let Token::Identifier(value) = self.peek_token.clone() {
             value
         } else {
-            return Err(Error);
+            return Err(ParserError::new("Expected identifier".to_string()));
         };
 
         if !self.peek_and_expect(Token::Identifier(identifier_token)) {
-            return Err(Error);
+            return Err(ParserError::new("Expected identifier".to_string()));
         }
 
         let identifier = Identifier {
@@ -74,12 +107,14 @@ impl Parser {
             value: if let Token::Identifier(value) = self.current_token.clone() {
                 value
             } else {
-                return Err(Error);
+                return Err(ParserError::new("Expected identifier".to_string()));
             },
         };
 
         if !self.peek_and_expect(Token::Assign) {
-            return Err(Error);
+            return Err(ParserError::new(
+                format!("Expected token to be `Assign`, got {}", self.peek_token).into(),
+            ));
         }
 
         // TODO: Skip expressions until we find a semicolon
@@ -95,11 +130,12 @@ impl Parser {
         }))
     }
 
-    fn peek_and_expect(&mut self, expected: Token) -> bool {
-        if self.peek_token_is(expected) {
+    fn peek_and_expect(&mut self, token: Token) -> bool {
+        if self.peek_token_is(&token) {
             self.next_token();
             return true;
         }
+        self.peek_error(token);
         false
     }
 
@@ -107,8 +143,8 @@ impl Parser {
         self.current_token == token
     }
 
-    fn peek_token_is(&self, token: Token) -> bool {
-        self.peek_token == token
+    fn peek_token_is(&self, token: &Token) -> bool {
+        self.peek_token == *token
     }
 }
 
@@ -149,6 +185,10 @@ mod tests {
 
         match program {
             Err(_) => {
+                let errors = parser.errors();
+                for error in errors {
+                    println!("{}", error);
+                }
                 panic!("Expected program, got error");
             }
             Ok(program) => {

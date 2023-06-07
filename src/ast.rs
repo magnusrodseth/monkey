@@ -1,6 +1,6 @@
 use std::any::Any;
 
-use crate::lexer::Token;
+use crate::token::Token;
 
 pub trait Node: Any {
     fn token(&self) -> Token;

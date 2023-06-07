@@ -51,3 +51,4 @@ This chapter finished with a very simple REPL, which prompts the user for input,
 - [ ] also attach the line number, column number and filename to a token. Why? For example, to later output more useful error messages in the parsing stage. Instead of "error: expected semicolon token" it can output with line numbers etc.
 - [ ] Don't treat all integers as `i64`. Based on size, allocate only the type needed.
 - [ ] Support floating point numbers.
+- [ ] Flesh out the `Error` in the parser to contain more information about what kind of error occurred. That way, the user gets a much better compile time error.
