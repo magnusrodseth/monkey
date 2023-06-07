@@ -52,9 +52,7 @@ pub struct Identifier {
 }
 
 impl Expression for Identifier {
-    fn expression_node(&self) {
-        todo!()
-    }
+    fn expression_node(&self) {}
 }
 
 impl Node for Identifier {
@@ -78,9 +76,7 @@ pub struct LetStatement {
 }
 
 impl Statement for LetStatement {
-    fn statement_node(&self) {
-        todo!()
-    }
+    fn statement_node(&self) {}
 }
 
 impl Node for LetStatement {
@@ -108,9 +104,7 @@ pub struct ReturnStatement {
 }
 
 impl Statement for ReturnStatement {
-    fn statement_node(&self) {
-        todo!()
-    }
+    fn statement_node(&self) {}
 }
 
 impl Node for ReturnStatement {
@@ -137,9 +131,7 @@ pub struct ExpressionStatement {
 }
 
 impl Statement for ExpressionStatement {
-    fn statement_node(&self) {
-        todo!()
-    }
+    fn statement_node(&self) {}
 }
 
 impl Node for ExpressionStatement {
@@ -157,6 +149,29 @@ impl Node for ExpressionStatement {
         } else {
             "".into()
         }
+    }
+}
+
+pub struct IntegerLiteral {
+    pub token: Token,
+    pub value: i64,
+}
+
+impl Expression for IntegerLiteral {
+    fn expression_node(&self) {}
+}
+
+impl Node for IntegerLiteral {
+    fn token(&self) -> Token {
+        self.token.clone()
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn to_string(&self) -> String {
+        self.value.to_string()
     }
 }
 

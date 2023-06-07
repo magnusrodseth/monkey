@@ -2,8 +2,8 @@ use std::{collections::HashMap, error::Error, fmt::Display};
 
 use crate::{
     ast::{
-        Expression, ExpressionStatement, Identifier, LetStatement, Program, ReturnStatement,
-        Statement,
+        Expression, ExpressionStatement, Identifier, IntegerLiteral, LetStatement, Program,
+        ReturnStatement, Statement,
     },
     lexer::Lexer,
     token::Token,
@@ -46,7 +46,7 @@ impl ParserError {
 }
 
 type PrefixParseFn = dyn Fn(&Parser) -> Option<Box<dyn Expression>>;
-type InfixParseFn = dyn Fn(Box<dyn Expression>) -> Option<Box<dyn Expression>>;
+type InfixParseFn = dyn Fn(&Parser, Box<dyn Expression>) -> Option<Box<dyn Expression>>;
 
 struct Parser {
     lexer: Lexer,
@@ -72,6 +72,10 @@ impl Parser {
         parser.add_prefix(
             Token::Identifier("".to_string()),
             Box::new(|parser| parser.parse_identifier()),
+        );
+        parser.add_prefix(
+            Token::Integer(0),
+            Box::new(|parser| parser.parse_integer_literal()),
         );
 
         // Read two tokens, such that both `current_token` and `peek_token` are set
@@ -105,7 +109,7 @@ impl Parser {
         while !self.current_token_is(Token::EOF) {
             match self.parse_statement() {
                 Ok(statement) => program.statements.push(statement),
-                Err(error) => return Err(error),
+                Err(error) => self.errors.push(error),
             }
 
             self.next_token();
@@ -239,12 +243,24 @@ impl Parser {
 
         return function;
     }
+
+    fn parse_integer_literal(&self) -> Option<Box<dyn Expression>> {
+        let token = self.current_token.clone();
+
+        let value = if let Token::Integer(value) = self.current_token.clone() {
+            value
+        } else {
+            return None;
+        };
+
+        Some(Box::new(IntegerLiteral { token, value }))
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ast::{ExpressionStatement, LetStatement, ReturnStatement};
+    use crate::ast::{ExpressionStatement, IntegerLiteral, LetStatement, ReturnStatement};
 
     /// Casts an expression into a specific type, panicking if the cast fails.
     macro_rules! cast_into {
@@ -367,6 +383,35 @@ mod tests {
                         let identifier = cast_into!(expr, Identifier);
                         assert_eq!(identifier.value, "foobar");
                         assert_eq!(identifier.token, Token::Identifier("foobar".into()));
+                    }
+                } else {
+                    panic!("Expected statement, got something else");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn integer_literal_as_expression() {
+        let input = "5;";
+
+        let lexer = Lexer::new(input.into());
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse();
+
+        match program {
+            Err(_) => {
+                handle_parser_errors!(parser.errors());
+            }
+            Ok(program) => {
+                assert_eq!(program.statements.len(), 1);
+
+                if let Some(statement) = program.statements.first() {
+                    let expression = cast_into!(statement, ExpressionStatement);
+                    if let Some(expr) = &expression.expression {
+                        let integer = cast_into!(expr, IntegerLiteral);
+                        assert_eq!(integer.value, 5);
+                        assert_eq!(integer.token, Token::Integer(5));
                     }
                 } else {
                     panic!("Expected statement, got something else");
