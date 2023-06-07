@@ -175,6 +175,33 @@ impl Node for IntegerLiteral {
     }
 }
 
+pub struct PrefixExpression {
+    pub token: Token,
+    pub right: Option<Box<dyn Expression>>,
+}
+
+impl Expression for PrefixExpression {
+    fn expression_node(&self) {}
+}
+
+impl Node for PrefixExpression {
+    fn token(&self) -> Token {
+        self.token.clone()
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn to_string(&self) -> String {
+        format!(
+            "({}{})",
+            self.token.to_string(),
+            self.right.as_ref().expect("No right found").to_string()
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

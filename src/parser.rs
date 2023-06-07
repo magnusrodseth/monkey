@@ -1,9 +1,9 @@
-use std::{collections::HashMap, error::Error, fmt::Display};
+use std::{cell::RefCell, collections::HashMap, error::Error, fmt::Display};
 
 use crate::{
     ast::{
-        Expression, ExpressionStatement, Identifier, IntegerLiteral, LetStatement, Program,
-        ReturnStatement, Statement,
+        Expression, ExpressionStatement, Identifier, IntegerLiteral, LetStatement,
+        PrefixExpression, Program, ReturnStatement, Statement,
     },
     lexer::Lexer,
     token::Token,
@@ -77,6 +77,8 @@ impl Parser {
             Token::Integer(0),
             Box::new(|parser| parser.parse_integer_literal()),
         );
+        parser.add_prefix(Token::Bang, Box::new(|parser| parser.parse_prefix()));
+        parser.add_prefix(Token::Minus, Box::new(|parser| parser.parse_prefix()));
 
         // Read two tokens, such that both `current_token` and `peek_token` are set
         parser.next_token();
@@ -232,16 +234,15 @@ impl Parser {
         Ok(Box::new(ExpressionStatement { token, expression }))
     }
 
-    fn parse_expression(&mut self, precedence: Precedence) -> Option<Box<dyn Expression>> {
+    fn parse_expression(&self, precedence: Precedence) -> Option<Box<dyn Expression>> {
         let prefix = self.prefix_parse_fns.get(&self.current_token);
 
         if prefix.is_none() {
             return None;
         }
 
-        let function = prefix.expect("Prefix function has already been checked")(self);
-
-        return function;
+        let left_expression = prefix.expect("Prefix function has already been checked")(self);
+        return left_expression;
     }
 
     fn parse_integer_literal(&self) -> Option<Box<dyn Expression>> {
@@ -255,12 +256,25 @@ impl Parser {
 
         Some(Box::new(IntegerLiteral { token, value }))
     }
+
+    fn parse_prefix(&self) -> Option<Box<dyn Expression>> {
+        // let token = self.current_token.clone();
+        //
+        // self.next_token();
+        //
+        // let right = self.parse_expression(Precedence::Prefix);
+        //
+        // Some(Box::new(PrefixExpression { token, right }))
+        todo!()
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ast::{ExpressionStatement, IntegerLiteral, LetStatement, ReturnStatement};
+    use crate::ast::{
+        ExpressionStatement, IntegerLiteral, LetStatement, PrefixExpression, ReturnStatement,
+    };
 
     /// Casts an expression into a specific type, panicking if the cast fails.
     macro_rules! cast_into {
@@ -415,6 +429,54 @@ mod tests {
                     }
                 } else {
                     panic!("Expected statement, got something else");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn prefix_expressions() {
+        struct PrefixExpressionTest<'a> {
+            input: &'a str,
+            integer_value: i64,
+        }
+
+        let tests = vec![
+            PrefixExpressionTest {
+                input: "!5;",
+                integer_value: 5,
+            },
+            PrefixExpressionTest {
+                input: "-15;",
+                integer_value: 15,
+            },
+        ];
+
+        for test in tests {
+            let lexer = Lexer::new(test.input.into());
+            let mut parser = Parser::new(lexer);
+            let program = parser.parse();
+
+            match program {
+                Err(_) => {
+                    handle_parser_errors!(parser.errors());
+                }
+                Ok(program) => {
+                    assert_eq!(program.statements.len(), 1);
+
+                    if let Some(statement) = program.statements.first() {
+                        let expression = cast_into!(statement, ExpressionStatement);
+                        if let Some(expression) = &expression.expression {
+                            let prefix = cast_into!(expression, PrefixExpression);
+                            if let Some(integer) = &prefix.right {
+                                let integer = cast_into!(integer, IntegerLiteral);
+                                assert_eq!(integer.value, test.integer_value);
+                                assert_eq!(integer.token, Token::Integer(test.integer_value));
+                            }
+                        }
+                    } else {
+                        panic!("Expected statement, got something else");
+                    }
                 }
             }
         }
