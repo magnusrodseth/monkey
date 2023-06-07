@@ -117,9 +117,7 @@ impl Lexer {
     }
 
     fn is_letter(&self) -> bool {
-        self.current_char >= 'a' && self.current_char <= 'z'
-            || self.current_char >= 'A' && self.current_char <= 'Z'
-            || self.current_char == '_'
+        self.current_char.is_alphabetic() || self.current_char == '_'
     }
 
     fn read_integer(&mut self) -> i64 {

@@ -57,6 +57,7 @@ impl Node for Identifier {
 pub struct LetStatement {
     pub token: Token,
     pub name: Identifier,
+    // TODO: Remove option after implementing expressions
     pub value: Option<Box<dyn Expression>>,
 }
 
@@ -67,6 +68,28 @@ impl Statement for LetStatement {
 }
 
 impl Node for LetStatement {
+    fn token(&self) -> Token {
+        self.token.clone()
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
+pub struct ReturnStatement {
+    pub token: Token,
+    // TODO: Remove option after implementing expressions
+    pub return_value: Option<Box<dyn Expression>>,
+}
+
+impl Statement for ReturnStatement {
+    fn statement_node(&self) {
+        todo!()
+    }
+}
+
+impl Node for ReturnStatement {
     fn token(&self) -> Token {
         self.token.clone()
     }

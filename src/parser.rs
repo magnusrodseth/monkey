@@ -1,7 +1,7 @@
 use std::{error::Error, fmt::Display};
 
 use crate::{
-    ast::{Identifier, LetStatement, Program, Statement},
+    ast::{Identifier, LetStatement, Program, ReturnStatement, Statement},
     lexer::Lexer,
     token::Token,
 };
@@ -84,6 +84,7 @@ impl Parser {
     fn parse_statement(&mut self) -> Result<Box<dyn Statement>, ParserError> {
         match self.current_token {
             Token::Let => self.parse_let_statement(),
+            Token::Return => self.parse_return_statement(),
             _ => todo!(),
         }
     }
@@ -146,18 +147,35 @@ impl Parser {
     fn peek_token_is(&self, token: &Token) -> bool {
         self.peek_token == *token
     }
+
+    fn parse_return_statement(&mut self) -> Result<Box<dyn Statement>, ParserError> {
+        let statement_token = self.current_token.clone();
+
+        self.next_token();
+
+        // TODO: Skip expressions until we find a semicolon
+        while !self.current_token_is(Token::Semicolon) {
+            self.next_token();
+        }
+
+        Ok(Box::new(ReturnStatement {
+            token: statement_token,
+            // TODO: Pars expresion
+            return_value: None,
+        }))
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ast::LetStatement;
+    use crate::ast::{LetStatement, ReturnStatement};
 
     macro_rules! assert_let_statement_eq {
         ($let_statement:expr, $expected_identifier:expr) => {
             assert_eq!($let_statement.token(), Token::Let);
 
-            // Cast the statement to any and then downcast to LetStatement
+            // Cast the statement to any and then downcast
             if let Some(let_statement) = $let_statement.as_any().downcast_ref::<LetStatement>() {
                 assert_eq!(let_statement.name.value, $expected_identifier.to_string());
                 assert_eq!(
@@ -167,6 +185,30 @@ mod tests {
             } else {
                 panic!("Expected let statement, got something else");
             }
+        };
+    }
+
+    macro_rules! assert_return_statement_eq {
+        ($return_statement:expr) => {
+            assert_eq!($return_statement.token(), Token::Return);
+
+            // Cast the statement to any and then downcast
+            if let Some(return_statement) =
+                $return_statement.as_any().downcast_ref::<ReturnStatement>()
+            {
+                assert_eq!(return_statement.token, Token::Return);
+            } else {
+                panic!("Expected return statement, got something else");
+            }
+        };
+    }
+
+    macro_rules! handle_parser_errors {
+        ($errors:expr) => {
+            for error in $errors {
+                println!("{}", error);
+            }
+            panic!("Expected program, got error");
         };
     }
 
@@ -185,11 +227,7 @@ mod tests {
 
         match program {
             Err(_) => {
-                let errors = parser.errors();
-                for error in errors {
-                    println!("{}", error);
-                }
-                panic!("Expected program, got error");
+                handle_parser_errors!(parser.errors());
             }
             Ok(program) => {
                 assert_eq!(program.statements.len(), 3);
@@ -197,6 +235,32 @@ mod tests {
                 for (i, expected_identifier) in expected_identifiers.iter().enumerate() {
                     let statement = &program.statements[i];
                     assert_let_statement_eq!(statement, expected_identifier);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn return_statement() {
+        let input = "
+            return 5;
+            return 10;
+            return 993322;
+        ";
+
+        let lexer = Lexer::new(input.into());
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse();
+
+        match program {
+            Err(_) => {
+                handle_parser_errors!(parser.errors());
+            }
+            Ok(program) => {
+                assert_eq!(program.statements.len(), 3);
+
+                for statement in program.statements {
+                    assert_return_statement_eq!(statement);
                 }
             }
         }
