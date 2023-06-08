@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::fmt::{format, Display};
 
 #[derive(Debug, PartialEq, Clone, Eq, Hash)]
 pub enum Token {
@@ -39,13 +39,47 @@ pub enum Token {
     Return,
 }
 
+impl Token {
+    pub fn formatted(&self) -> String {
+        match self {
+            Token::Illegal => "Illegal".into(),
+            Token::EOF => "EOF".into(),
+            Token::Identifier(identifier) => format!("{}", identifier),
+            Token::Integer(integer) => format!("{}", integer),
+            Token::Plus => "+".into(),
+            Token::Assign => "=".into(),
+            Token::Minus => "-".into(),
+            Token::Bang => "!".into(),
+            Token::Asterisk => "*".into(),
+            Token::Slash => "/".into(),
+            Token::GreaterThan => ">".into(),
+            Token::LessThan => "<".into(),
+            Token::Equal => "==".into(),
+            Token::NotEqual => "!=".into(),
+            Token::Comma => ",".into(),
+            Token::Semicolon => ";".into(),
+            Token::LeftParenthesis => "(".into(),
+            Token::RightParenthesis => ")".into(),
+            Token::LeftBrace => "{".into(),
+            Token::RightBrace => "}".into(),
+            Token::Function => "fn".into(),
+            Token::Let => "let".into(),
+            Token::True => "true".into(),
+            Token::False => "false".into(),
+            Token::If => "if".into(),
+            Token::Else => "else".into(),
+            Token::Return => "return".into(),
+        }
+    }
+}
+
 impl Display for Token {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Token::Illegal => write!(f, "Illegal"),
             Token::EOF => write!(f, "EOF"),
-            Token::Identifier(identifier) => write!(f, "Identifier({})", identifier),
-            Token::Integer(integer) => write!(f, "Integer({})", integer),
+            Token::Identifier(identifier) => write!(f, "{}", identifier),
+            Token::Integer(integer) => write!(f, "{}", integer),
             Token::Plus => write!(f, "Plus"),
             Token::Assign => write!(f, "Assign"),
             Token::Minus => write!(f, "Minus"),

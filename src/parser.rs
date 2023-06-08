@@ -2,14 +2,14 @@ use std::{collections::HashMap, error::Error, fmt::Display};
 
 use crate::{
     ast::{
-        Expression, ExpressionStatement, Identifier, IntegerLiteral, LetStatement,
+        Expression, ExpressionStatement, Identifier, InfixExpression, IntegerLiteral, LetStatement,
         PrefixExpression, Program, ReturnStatement, Statement,
     },
     lexer::Lexer,
     token::Token,
 };
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Clone)]
 enum Precedence {
     Lowest,
     /// ==
@@ -50,6 +50,7 @@ struct Parser {
     current_token: Token,
     peek_token: Token,
     errors: Vec<ParserError>,
+    precedences: HashMap<Token, Precedence>,
 }
 
 impl Parser {
@@ -59,6 +60,7 @@ impl Parser {
             current_token: Token::EOF,
             peek_token: Token::EOF,
             errors: Vec::new(),
+            precedences: Self::precedences(),
         };
 
         // Read two tokens, such that both `current_token` and `peek_token` are set
@@ -77,6 +79,22 @@ impl Parser {
             "Expected next token to be {:?}, got {:?}",
             token, self.peek_token
         )));
+    }
+
+    fn peek_precedence(&self) -> Precedence {
+        if let Some(precedence) = self.precedences.get(&self.peek_token) {
+            precedence.clone()
+        } else {
+            Precedence::Lowest
+        }
+    }
+
+    fn current_precedence(&self) -> Precedence {
+        if let Some(precedence) = self.precedences.get(&self.current_token) {
+            precedence.clone()
+        } else {
+            Precedence::Lowest
+        }
     }
 
     fn next_token(&mut self) {
@@ -217,10 +235,16 @@ impl Parser {
     }
 
     fn parse_expression(&mut self, precedence: Precedence) -> Option<Box<dyn Expression>> {
-        let left = match self.current_token {
+        dbg!(self.current_token.clone());
+        dbg!(self.peek_token.clone());
+        dbg!(precedence.clone());
+        println!();
+
+        // Parse prefix
+        let mut left = match self.current_token {
             Token::Integer(_) => self.parse_integer_literal(),
             Token::Identifier(_) => self.parse_identifier(),
-            Token::Bang | Token::Minus => self.parse_prefix(),
+            Token::Bang | Token::Minus | Token::Plus => self.parse_prefix(),
             _ => {
                 self.errors.push(ParserError::new(
                     format!("No prefix parse function for {}", self.current_token).into(),
@@ -228,6 +252,17 @@ impl Parser {
                 None
             }
         };
+
+        // Parse infix
+        while !self.peek_token_is(&Token::Semicolon) && precedence < self.peek_precedence() {
+            match self.precedences.get(&self.peek_token) {
+                Some(_) => {
+                    self.next_token();
+                    left = self.parse_infix(left.expect("Expected left expression"));
+                }
+                _ => return left,
+            }
+        }
 
         left
     }
@@ -256,6 +291,36 @@ impl Parser {
             })),
             None => None,
         }
+    }
+
+    fn parse_infix(&mut self, left: Box<dyn Expression>) -> Option<Box<dyn Expression>> {
+        let token = self.current_token.clone();
+        let precedence = self.current_precedence();
+        self.next_token();
+        let right = self.parse_expression(precedence);
+
+        match right {
+            Some(right) => Some(Box::new(InfixExpression { token, left, right })),
+            None => None,
+        }
+    }
+
+    fn precedences() -> HashMap<Token, Precedence> {
+        let mut precedences = HashMap::new();
+
+        precedences.insert(Token::Equal, Precedence::Equals);
+        precedences.insert(Token::NotEqual, Precedence::Equals);
+
+        precedences.insert(Token::LessThan, Precedence::LessThanOrGreaterThan);
+        precedences.insert(Token::GreaterThan, Precedence::LessThanOrGreaterThan);
+
+        precedences.insert(Token::Plus, Precedence::Sum);
+        precedences.insert(Token::Minus, Precedence::Sum);
+
+        precedences.insert(Token::Slash, Precedence::Product);
+        precedences.insert(Token::Asterisk, Precedence::Product);
+
+        precedences
     }
 }
 
@@ -481,7 +546,7 @@ mod tests {
     }
 
     #[test]
-    fn infex_expressions() {
+    fn infix_expressions() {
         struct InfixExpressionTest<'a> {
             input: &'a str,
             left_value: i64,
@@ -562,7 +627,7 @@ mod tests {
                             let right = cast_into!(infix.right, IntegerLiteral);
                             assert_integer_literal_eq!(right, test.right_value);
 
-                            assert_eq!(infix.operator, test.operator);
+                            assert_eq!(infix.token.formatted(), test.operator);
 
                             assert_eq!(right.value, test.right_value);
                             assert_eq!(right.token, Token::Integer(test.right_value));
@@ -570,6 +635,81 @@ mod tests {
                     } else {
                         panic!("Expected statement, got something else");
                     }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn operator_precedence() {
+        struct OperatorPrecedenceTest<'a> {
+            input: &'a str,
+            expected: &'a str,
+        }
+
+        let expected = vec![
+            OperatorPrecedenceTest {
+                input: "-a * b",
+                expected: "((-a) * b)",
+            },
+            OperatorPrecedenceTest {
+                input: "!-a",
+                expected: "(!(-a))",
+            },
+            OperatorPrecedenceTest {
+                input: "a + b + c",
+                expected: "((a + b) + c)",
+            },
+            OperatorPrecedenceTest {
+                input: "a + b - c",
+                expected: "((a + b) - c)",
+            },
+            OperatorPrecedenceTest {
+                input: "a * b * c",
+                expected: "((a * b) * c)",
+            },
+            OperatorPrecedenceTest {
+                input: "a * b / c",
+                expected: "((a * b) / c)",
+            },
+            OperatorPrecedenceTest {
+                input: "a + b / c",
+                expected: "(a + (b / c))",
+            },
+            OperatorPrecedenceTest {
+                input: "a + b * c + d / e - f",
+                expected: "(((a + (b * c)) + (d / e)) - f)",
+            },
+            OperatorPrecedenceTest {
+                input: "3 + 4; -5 * 5",
+                expected: "(3 + 4)((-5) * 5)",
+            },
+            OperatorPrecedenceTest {
+                input: "5 > 4 == 3 < 4",
+                expected: "((5 > 4) == (3 < 4))",
+            },
+            OperatorPrecedenceTest {
+                input: "5 < 4 != 3 > 4",
+                expected: "((5 < 4) != (3 > 4))",
+            },
+            OperatorPrecedenceTest {
+                input: "3 + 4 * 5 == 3 * 1 + 4 * 5",
+                expected: "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))",
+            },
+        ];
+
+        for test in expected {
+            let lexer = Lexer::new(test.input.into());
+            let mut parser = Parser::new(lexer);
+            let program = parser.parse();
+            print_parser_errors!(parser.errors());
+
+            match program {
+                Err(_) => {
+                    panic!("Parser error");
+                }
+                Ok(program) => {
+                    assert_eq!(program.to_string(), test.expected);
                 }
             }
         }

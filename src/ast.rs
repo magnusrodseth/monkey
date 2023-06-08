@@ -1,4 +1,3 @@
-use core::fmt;
 use std::any::Any;
 
 use crate::token::Token;
@@ -19,6 +18,18 @@ pub trait Expression: Node {
 
 pub struct Program {
     pub statements: Vec<Box<dyn Statement>>,
+}
+
+impl Program {
+    pub fn to_string(&self) -> String {
+        let mut output = String::new();
+
+        for statement in self.statements.iter() {
+            output.push_str(&statement.to_string());
+        }
+
+        output
+    }
 }
 
 impl Node for Program {
@@ -91,7 +102,7 @@ impl Node for LetStatement {
     fn to_string(&self) -> String {
         format!(
             "{} {} = {};",
-            self.token.to_string().to_lowercase(),
+            self.token.formatted(),
             self.name.to_string(),
             self.value.as_ref().expect("No value found").to_string()
         )
@@ -118,7 +129,7 @@ impl Node for ReturnStatement {
 
     fn to_string(&self) -> String {
         if let Some(return_value) = &self.return_value {
-            format!("{} {};", self.token, return_value.to_string())
+            format!("{} {};", self.token.formatted(), return_value.to_string())
         } else {
             format!("{};", self.token)
         }
@@ -196,7 +207,7 @@ impl Node for PrefixExpression {
     fn to_string(&self) -> String {
         format!(
             "({}{})",
-            self.token.to_string(),
+            self.token.formatted(),
             self.right.as_ref().to_string()
         )
     }
@@ -205,7 +216,6 @@ impl Node for PrefixExpression {
 pub struct InfixExpression {
     pub token: Token,
     pub left: Box<dyn Expression>,
-    pub operator: String,
     pub right: Box<dyn Expression>,
 }
 
@@ -226,7 +236,7 @@ impl Node for InfixExpression {
         format!(
             "({} {} {})",
             self.left.as_ref().to_string(),
-            self.operator,
+            self.token.formatted(),
             self.right.as_ref().to_string()
         )
     }
@@ -237,7 +247,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn ast_to_string() {
+    fn let_statement_to_string() {
         let program = Program {
             statements: vec![Box::new(LetStatement {
                 token: Token::Let,
@@ -253,5 +263,90 @@ mod tests {
         };
 
         assert_eq!(program.to_string(), "let myVar = anotherVar;");
+    }
+
+    #[test]
+    fn infix_expression_to_string() {
+        let program = Program {
+            statements: vec![Box::new(ExpressionStatement {
+                token: Token::Identifier("x".into()),
+                expression: Some(Box::new(InfixExpression {
+                    token: Token::Plus,
+                    left: Box::new(IntegerLiteral {
+                        token: Token::Integer(5),
+                        value: 5,
+                    }),
+                    right: Box::new(IntegerLiteral {
+                        token: Token::Integer(10),
+                        value: 10,
+                    }),
+                })),
+            })],
+        };
+
+        assert_eq!(program.to_string(), "(5 + 10)");
+    }
+
+    #[test]
+    fn prefix_expression_to_string() {
+        let program = Program {
+            statements: vec![Box::new(ExpressionStatement {
+                token: Token::Identifier("x".into()),
+                expression: Some(Box::new(PrefixExpression {
+                    token: Token::Minus,
+                    right: Box::new(IntegerLiteral {
+                        token: Token::Integer(5),
+                        value: 5,
+                    }),
+                })),
+            })],
+        };
+
+        assert_eq!(program.to_string(), "(-5)");
+    }
+
+    #[test]
+    fn integer_literal_to_string() {
+        let program = Program {
+            statements: vec![Box::new(ExpressionStatement {
+                token: Token::Identifier("x".into()),
+                expression: Some(Box::new(IntegerLiteral {
+                    token: Token::Integer(5),
+                    value: 5,
+                })),
+            })],
+        };
+
+        assert_eq!(program.to_string(), "5");
+    }
+
+    #[test]
+    fn identifier_to_string() {
+        let program = Program {
+            statements: vec![Box::new(ExpressionStatement {
+                token: Token::Identifier("x".into()),
+                expression: Some(Box::new(Identifier {
+                    token: Token::Identifier("x".into()),
+                    value: "x".into(),
+                })),
+            })],
+        };
+
+        assert_eq!(program.to_string(), "x");
+    }
+
+    #[test]
+    fn return_statement_to_string() {
+        let program = Program {
+            statements: vec![Box::new(ReturnStatement {
+                token: Token::Return,
+                return_value: Some(Box::new(Identifier {
+                    token: Token::Identifier("x".into()),
+                    value: "x".into(),
+                })),
+            })],
+        };
+
+        assert_eq!(program.to_string(), "return x;");
     }
 }
