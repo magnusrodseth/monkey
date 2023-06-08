@@ -40,7 +40,38 @@ This chapter finished with a very simple REPL, which prompts the user for input,
 
 ### Chapter 2 - Parsing
 
-> TODO
+Parsing focuses on parsing the stream of tokens into an abstract syntax tree (AST). The AST is a tree representation of the source code. It's a way to represent the source code in a way that's easier to work with. The AST is defined in [`src/ast.rs`](/src/ast.rs), and the parser is defined in [`src/parser.rs`](/src/parser.rs).
+
+This task of parsing was much larger than the lexical analysis, and much more challenging.
+
+#### The abstract syntax tree (AST)
+
+I learnt a lot about traits in Rust, especially when defining the abstract syntax tree. Traits in Rust are equivalent to interfaces in other languages. They allow us to define a set of methods that a type must implement. The only reason nodes in the AST need to implement `as_any()` is because we need to downcast them in the parser tests. Below follows an overview of the type of nodes in the AST:
+
+- **Statements**
+  - `LetStatement`
+  - `ReturnStatement`
+  - `ExpressionStatement`, which is just a wrapper around an `Expression`
+  - `BlockStatement`
+- **Expressions**
+  - `Identifier`
+  - `IntegerLiteral`
+  - `PrefixExpression`
+  - `InfixExpression`
+  - `Boolean`
+  - `IfExpression`
+  - `FunctionLiteral`
+  - `CallExpression`
+
+#### The parser
+
+The parser is responsible for the semantics of the language, i.e. what the tokens mean. It's a recursive descent parser, which means it's a top-down parser with one lookahead token. The parser is defined in [`src/parser.rs`](/src/parser.rs). In order to facilitate good error messages from my interpreter, I created a custom `ParserError`. This can be extended later on to include more information about the error, such as the line number, column number, and filename. The most challenging part of the parser was implementing the recursive parsing of expressions. I had to think carefully about the precedence of operators, and how to handle them. This was solved using a precedence table, specifically using a hashmap.
+
+I wrote extensive tests for the parser, which was very helpful. I also created several custom macros to reduce some boilerplate in the tests. I found writing tests in a test-first manner to be very helpful. I would write a test, then implement the functionality to make the test pass. This was a very iterative process, and I found myself refactoring the parser a lot.
+
+#### Extending the REPL
+
+After fully implementing the parser for the abstract syntax tree, I extended the REPL to now display the parsed AST. Earlier, only the lexical information was displayed back to the user when interacting with the REPL. Now, the parsed AST is displayed back to the user. This is a huge step forward.
 
 ---
 
