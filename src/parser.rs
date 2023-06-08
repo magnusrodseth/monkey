@@ -288,15 +288,14 @@ impl Parser {
     }
 
     fn parse_prefix(&mut self) -> Option<Box<dyn Expression>> {
+        let token = self.current_token.clone();
+
         self.next_token();
 
         let right = self.parse_expression(Precedence::Prefix);
 
         match right {
-            Some(right) => Some(Box::new(PrefixExpression {
-                token: self.current_token.clone(),
-                right,
-            })),
+            Some(right) => Some(Box::new(PrefixExpression { token, right })),
             None => None,
         }
     }
