@@ -99,16 +99,53 @@ impl Display for Expression {
                 consequence,
                 alternative,
             } => {
-                todo!()
+                let mut string = format!("if {} {}", condition, consequence);
+
+                if let Some(alternative) = alternative {
+                    string.push_str(&format!(" else {}", alternative));
+                }
+
+                write!(f, "{}", string)
             }
             Expression::Function { parameters, body } => {
-                todo!()
+                let mut string = String::new();
+
+                string.push_str("fn(");
+
+                for (index, parameter) in parameters.iter().enumerate() {
+                    string.push_str(&parameter.0);
+
+                    if index != parameters.len() - 1 {
+                        string.push_str(", ");
+                    }
+                }
+
+                string.push_str(") { ");
+                string.push_str(&body.to_string());
+                string.push_str(" }");
+
+                write!(f, "{}", string)
             }
             Expression::Call {
                 function,
                 arguments,
             } => {
-                todo!()
+                let mut string = String::new();
+
+                string.push_str(&function.to_string());
+                string.push_str("(");
+
+                for (index, argument) in arguments.iter().enumerate() {
+                    string.push_str(&argument.to_string());
+
+                    if index != arguments.len() - 1 {
+                        string.push_str(", ");
+                    }
+                }
+
+                string.push_str(")");
+
+                write!(f, "{}", string)
             }
         }
     }
@@ -148,6 +185,18 @@ impl Display for Statement {
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct BlockStatement {
     pub statements: Vec<Statement>,
+}
+
+impl Display for BlockStatement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut block = String::new();
+
+        for statement in self.statements.iter() {
+            block.push_str(&statement.to_string());
+        }
+
+        write!(f, "{}", block)
+    }
 }
 
 pub struct Program {
