@@ -2,8 +2,9 @@ use std::{collections::HashMap, error::Error, fmt::Display};
 
 use crate::{
     ast::{
-        Boolean, Expression, ExpressionStatement, Identifier, InfixExpression, IntegerLiteral,
-        LetStatement, PrefixExpression, Program, ReturnStatement, Statement,
+        BlockStatement, Boolean, Expression, ExpressionStatement, Identifier, IfExpression,
+        InfixExpression, IntegerLiteral, LetStatement, PrefixExpression, Program, ReturnStatement,
+        Statement,
     },
     lexer::Lexer,
     token::Token,
@@ -227,7 +228,11 @@ impl Parser {
                 }))
             }
             None => Err(ParserError::new(
-                format!("Expected expression, got {}", self.current_token).into(),
+                format!(
+                    "Expected expression, got {}",
+                    self.current_token.formatted()
+                )
+                .into(),
             )),
         }
     }
@@ -240,9 +245,14 @@ impl Parser {
             Token::Bang | Token::Minus | Token::Plus => self.parse_prefix(),
             Token::True | Token::False => self.parse_boolean(),
             Token::LeftParenthesis => self.parse_grouped_expression(),
+            Token::If => self.parse_if_expression(),
             _ => {
                 self.errors.push(ParserError::new(
-                    format!("No prefix parse function for {}", self.current_token).into(),
+                    format!(
+                        "No prefix parse function for {}",
+                        self.current_token.formatted()
+                    )
+                    .into(),
                 ));
                 None
             }
@@ -335,14 +345,78 @@ impl Parser {
 
         expression
     }
+
+    fn parse_if_expression(&mut self) -> Option<Box<dyn Expression>> {
+        let token = self.current_token.clone();
+
+        if !self.peek_and_expect(Token::LeftParenthesis) {
+            return None;
+        }
+
+        self.next_token();
+
+        let condition = self.parse_expression(Precedence::Lowest);
+
+        if !self.peek_and_expect(Token::RightParenthesis) {
+            return None;
+        }
+
+        if !self.peek_and_expect(Token::LeftBrace) {
+            return None;
+        }
+
+        let consequence = self.parse_block_statement();
+
+        if self.peek_token_is(&Token::Else) {
+            self.next_token();
+
+            if !self.peek_and_expect(Token::LeftBrace) {
+                return None;
+            }
+
+            let alternative = self.parse_block_statement();
+
+            return Some(Box::new(IfExpression {
+                token,
+                condition: condition.expect("Expected condition"),
+                consequence,
+                alternative: Some(alternative),
+            }));
+        }
+
+        Some(Box::new(IfExpression {
+            token,
+            condition: condition.expect("Expected condition"),
+            consequence,
+            alternative: None,
+        }))
+    }
+
+    fn parse_block_statement(&mut self) -> BlockStatement {
+        let token = self.current_token.clone();
+        let mut statements = Vec::new();
+
+        self.next_token();
+
+        while !self.current_token_is(Token::RightBrace) && !self.current_token_is(Token::EOF) {
+            match self.parse_statement() {
+                Ok(statement) => statements.push(statement),
+                Err(err) => self.errors.push(err),
+            }
+
+            self.next_token();
+        }
+
+        BlockStatement { token, statements }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::ast::{
-        ExpressionStatement, InfixExpression, IntegerLiteral, LetStatement, PrefixExpression,
-        ReturnStatement,
+        BlockStatement, ExpressionStatement, IfExpression, InfixExpression, IntegerLiteral,
+        LetStatement, Node, PrefixExpression, ReturnStatement,
     };
 
     /// Casts an expression into a specific type, panicking if the cast fails.
@@ -764,6 +838,165 @@ mod tests {
                 }
                 Ok(program) => {
                     assert_eq!(program.to_string(), test.expected);
+                }
+            }
+        }
+    }
+
+    macro_rules! assert_if_expression {
+        ($expression:expr, $condition:expr, $consequence:expr, $alternative:expr, $has_alternative:expr) => {
+            let if_expression = cast_into!($expression, IfExpression);
+            let condition = cast_into!(if_expression.condition, InfixExpression);
+            let left = cast_into!(condition.left, Identifier);
+            assert_identifier_eq!(left, $condition);
+
+            let consequence = cast_into!(if_expression.consequence, BlockStatement);
+            assert_eq!(consequence.statements.len(), 1);
+
+            let consequence_expression =
+                cast_into!(consequence.statements.first().unwrap(), ExpressionStatement);
+            let consequence_identifier =
+                cast_into!(consequence_expression.expression.unwrap(), Identifier);
+            assert_identifier_eq!(consequence_identifier, $consequence);
+
+            if $has_alternative {
+                assert!(if_expression.alternative.is_some());
+                let alternative = cast_into!(if_expression.alternative.unwrap(), BlockStatement);
+                assert_eq!(alternative.statements.len(), 1);
+                let alternative_expression =
+                    cast_into!(alternative.statements.first().unwrap(), ExpressionStatement);
+                let alternative_identifier =
+                    cast_into!(alternative_expression.expression.unwrap(), Identifier);
+                assert_eq!(alternative_identifier.value, $alternative);
+            } else {
+                assert!(if_expression.alternative.is_none());
+            }
+        };
+    }
+
+    #[test]
+    fn simple_if() {
+        let input = "if (x < y) { x }";
+
+        let lexer = Lexer::new(input.into());
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse();
+
+        print_parser_errors!(parser.errors());
+
+        match program {
+            Err(_) => {
+                panic!("Parser error");
+            }
+            Ok(program) => {
+                assert_eq!(program.statements.len(), 1);
+
+                if let Some(statement) = program.statements.first() {
+                    // assert_if_expression!(statement, "x".into(), "x".into(), "".into(), false);
+
+                    let expression = cast_into!(statement, ExpressionStatement);
+                    if let Some(expression) = &expression.expression {
+                        let if_expression = cast_into!(expression, IfExpression);
+                        let condition = cast_into!(if_expression.condition, InfixExpression);
+                        let left = cast_into!(condition.left, Identifier);
+                        assert_eq!(left.value, "x");
+                        assert_eq!(condition.token.formatted(), "<");
+                        let right = cast_into!(condition.right, Identifier);
+                        assert_eq!(right.value, "y");
+
+                        let consequence = cast_into!(if_expression.consequence, BlockStatement);
+                        assert_eq!(consequence.statements.len(), 1);
+                        let consequence_statement = consequence.statements.first();
+                        if let Some(consequence_statement) = consequence_statement {
+                            let consequence =
+                                cast_into!(consequence_statement, ExpressionStatement);
+                            if let Some(expression) = &consequence.expression {
+                                let consequence_identifier = cast_into!(expression, Identifier);
+                                assert_identifier_eq!(consequence_identifier, "x".to_string());
+                            } else {
+                                panic!("Expected statement, got something else");
+                            }
+                        } else {
+                            panic!("Expected statement, got something else");
+                        }
+
+                        assert!(if_expression.alternative.is_none());
+                    }
+                } else {
+                    panic!("Expected statement, got something else");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn if_else() {
+        let input = "if (x < y) { x } else { y }";
+
+        let lexer = Lexer::new(input.into());
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse();
+
+        print_parser_errors!(parser.errors());
+
+        match program {
+            Err(_) => {
+                panic!("Parser error");
+            }
+            Ok(program) => {
+                assert_eq!(program.statements.len(), 1);
+
+                if let Some(statement) = program.statements.first() {
+                    // assert_if_expression!(statement, "x".into(), "x".into(), "".into(), false);
+
+                    let expression = cast_into!(statement, ExpressionStatement);
+                    if let Some(expression) = &expression.expression {
+                        let if_expression = cast_into!(expression, IfExpression);
+                        let condition = cast_into!(if_expression.condition, InfixExpression);
+                        let left = cast_into!(condition.left, Identifier);
+                        assert_eq!(left.value, "x");
+                        assert_eq!(condition.token.formatted(), "<");
+                        let right = cast_into!(condition.right, Identifier);
+                        assert_eq!(right.value, "y");
+
+                        let consequence = cast_into!(if_expression.consequence, BlockStatement);
+                        assert_eq!(consequence.statements.len(), 1);
+                        let consequence_statement = consequence.statements.first();
+                        if let Some(consequence_statement) = consequence_statement {
+                            let consequence =
+                                cast_into!(consequence_statement, ExpressionStatement);
+                            if let Some(expression) = &consequence.expression {
+                                let consequence_identifier = cast_into!(expression, Identifier);
+                                assert_identifier_eq!(consequence_identifier, "x".to_string());
+                            } else {
+                                panic!("Expected statement, got something else");
+                            }
+                        } else {
+                            panic!("Expected statement, got something else");
+                        }
+
+                        assert!(if_expression.alternative.is_some());
+
+                        let alternative =
+                            cast_into!(if_expression.alternative.as_ref().unwrap(), BlockStatement);
+
+                        assert_eq!(alternative.statements.len(), 1);
+                        let alternative_statement = alternative.statements.first();
+                        if let Some(alternative_statement) = alternative_statement {
+                            let alternative =
+                                cast_into!(alternative_statement, ExpressionStatement);
+                            if let Some(expression) = &alternative.expression {
+                                let alternative_identifier = cast_into!(expression, Identifier);
+                                assert_identifier_eq!(alternative_identifier, "y".to_string());
+                            } else {
+                                panic!("Expected statement, got something else");
+                            }
+                        } else {
+                            panic!("Expected statement, got something else");
+                        }
+                    } else {
+                        panic!("Expected statement, got something else");
+                    }
                 }
             }
         }
