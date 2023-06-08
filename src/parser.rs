@@ -392,6 +392,13 @@ mod tests {
         };
     }
 
+    macro_rules! assert_identifier_eq {
+        ($identifier:expr, $expected_value:expr) => {
+            assert_eq!($identifier.value, $expected_value);
+            assert_eq!($identifier.token, Token::Identifier($expected_value));
+        };
+    }
+
     #[test]
     fn let_statement() {
         let input = "
@@ -467,8 +474,7 @@ mod tests {
                     let expression = cast_into!(statement, ExpressionStatement);
                     if let Some(expr) = &expression.expression {
                         let identifier = cast_into!(expr, Identifier);
-                        assert_eq!(identifier.value, "foobar");
-                        assert_eq!(identifier.token, Token::Identifier("foobar".into()));
+                        assert_identifier_eq!(identifier, "foobar".to_string());
                     }
                 } else {
                     panic!("Expected statement, got something else");
