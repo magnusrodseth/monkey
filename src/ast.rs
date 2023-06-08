@@ -342,6 +342,42 @@ impl Node for BlockStatement {
     }
 }
 
+pub struct FunctionLiteral {
+    pub token: Token,
+    pub parameters: Vec<Identifier>,
+    pub body: BlockStatement,
+}
+
+impl Expression for FunctionLiteral {
+    fn expression_node(&self) {}
+}
+
+impl Node for FunctionLiteral {
+    fn token(&self) -> Token {
+        self.token.clone()
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn to_string(&self) -> String {
+        let mut output = format!("{}(", self.token.formatted());
+
+        for (i, parameter) in self.parameters.iter().enumerate() {
+            output.push_str(&parameter.to_string());
+
+            if i != self.parameters.len() - 1 {
+                output.push_str(", ");
+            }
+        }
+
+        output.push_str(&format!(") {}", self.body.to_string()));
+
+        output
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

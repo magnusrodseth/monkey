@@ -2,9 +2,9 @@ use std::{collections::HashMap, error::Error, fmt::Display};
 
 use crate::{
     ast::{
-        BlockStatement, Boolean, Expression, ExpressionStatement, Identifier, IfExpression,
-        InfixExpression, IntegerLiteral, LetStatement, PrefixExpression, Program, ReturnStatement,
-        Statement,
+        BlockStatement, Boolean, Expression, ExpressionStatement, FunctionLiteral, Identifier,
+        IfExpression, InfixExpression, IntegerLiteral, LetStatement, PrefixExpression, Program,
+        ReturnStatement, Statement,
     },
     lexer::Lexer,
     token::Token,
@@ -78,7 +78,8 @@ impl Parser {
     fn peek_error(&mut self, token: Token) {
         self.errors.push(ParserError::new(format!(
             "Expected next token to be {:?}, got {:?}",
-            token, self.peek_token
+            token.formatted(),
+            self.peek_token.formatted()
         )));
     }
 
@@ -246,6 +247,7 @@ impl Parser {
             Token::True | Token::False => self.parse_boolean(),
             Token::LeftParenthesis => self.parse_grouped_expression(),
             Token::If => self.parse_if_expression(),
+            Token::Function => self.parse_function_literal(),
             _ => {
                 self.errors.push(ParserError::new(
                     format!(
@@ -409,14 +411,78 @@ impl Parser {
 
         BlockStatement { token, statements }
     }
+
+    fn parse_function_literal(&mut self) -> Option<Box<dyn Expression>> {
+        let token = self.current_token.clone();
+
+        if !self.peek_and_expect(Token::LeftParenthesis) {
+            return None;
+        }
+
+        let parameters = self.parse_function_parameters();
+
+        if !self.peek_and_expect(Token::LeftBrace) {
+            return None;
+        }
+
+        let body = self.parse_block_statement();
+
+        Some(Box::new(FunctionLiteral {
+            token,
+            parameters,
+            body,
+        }))
+    }
+
+    fn parse_function_parameters(&mut self) -> Vec<Identifier> {
+        let mut identifiers = Vec::new();
+
+        if self.peek_token_is(&Token::RightParenthesis) {
+            self.next_token();
+            return identifiers;
+        }
+
+        self.next_token();
+
+        let identifier = Identifier {
+            token: self.current_token.clone(),
+            value: if let Token::Identifier(value) = self.current_token.clone() {
+                value
+            } else {
+                return identifiers;
+            },
+        };
+        identifiers.push(identifier);
+
+        while self.peek_token_is(&Token::Comma) {
+            self.next_token();
+            self.next_token();
+
+            let identifier = Identifier {
+                token: self.current_token.clone(),
+                value: if let Token::Identifier(value) = self.current_token.clone() {
+                    value
+                } else {
+                    return identifiers;
+                },
+            };
+            identifiers.push(identifier);
+        }
+
+        if !self.peek_and_expect(Token::RightParenthesis) {
+            return Vec::new();
+        }
+
+        identifiers
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::ast::{
-        BlockStatement, ExpressionStatement, IfExpression, InfixExpression, IntegerLiteral,
-        LetStatement, Node, PrefixExpression, ReturnStatement,
+        BlockStatement, ExpressionStatement, FunctionLiteral, IfExpression, InfixExpression,
+        IntegerLiteral, LetStatement, Node, PrefixExpression, ReturnStatement,
     };
 
     /// Casts an expression into a specific type, panicking if the cast fails.
@@ -949,6 +1015,104 @@ mod tests {
                     );
                 } else {
                     panic!("Expected expression, got something else");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn function_literal() {
+        let input = "fn(x, y) { x + y; }";
+
+        let lexer = Lexer::new(input.into());
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse();
+
+        print_parser_errors!(parser.errors());
+
+        match program {
+            Err(_) => {
+                panic!("Parser error");
+            }
+            Ok(program) => {
+                assert_eq!(program.statements.len(), 1);
+
+                let statement = program.statements.first().unwrap();
+                let expression = cast_into!(statement, ExpressionStatement);
+                let function = cast_into!(expression.expression.as_ref().unwrap(), FunctionLiteral);
+                assert_eq!(function.parameters.len(), 2);
+
+                let first_parameter = cast_into!(function.parameters.first().unwrap(), Identifier);
+                assert_identifier_eq!(first_parameter, "x".to_string());
+
+                let second_parameter = cast_into!(function.parameters.last().unwrap(), Identifier);
+                assert_identifier_eq!(second_parameter, "y".to_string());
+
+                let body = cast_into!(function.body, BlockStatement);
+                assert_eq!(body.statements.len(), 1);
+
+                let body_statement = body.statements.first().unwrap();
+                let body_expression = cast_into!(body_statement, ExpressionStatement);
+                let body_infix_expression = cast_into!(
+                    body_expression.expression.as_ref().unwrap(),
+                    InfixExpression
+                );
+                let left = cast_into!(body_infix_expression.left, Identifier);
+                let right = cast_into!(body_infix_expression.right, Identifier);
+
+                assert_eq!(body_infix_expression.token.formatted(), "+".to_string());
+                assert_identifier_eq!(left, "x".to_string());
+                assert_identifier_eq!(right, "y".to_string());
+            }
+        }
+    }
+
+    #[test]
+    fn function_parameters() {
+        struct Test<'a> {
+            input: &'a str,
+            parameters: Vec<&'a str>,
+        }
+
+        let tests = vec![
+            Test {
+                input: "fn() {};",
+                parameters: vec![],
+            },
+            Test {
+                input: "fn(x) {};",
+                parameters: vec!["x"],
+            },
+            Test {
+                input: "fn(x, y, z) {};",
+                parameters: vec!["x", "y", "z"],
+            },
+        ];
+
+        for test in tests {
+            let lexer = Lexer::new(test.input.into());
+            let mut parser = Parser::new(lexer);
+            let program = parser.parse();
+
+            print_parser_errors!(parser.errors());
+
+            match program {
+                Err(_) => {
+                    panic!("Parser error");
+                }
+                Ok(program) => {
+                    assert_eq!(program.statements.len(), 1);
+
+                    let statement = program.statements.first().unwrap();
+                    let expression = cast_into!(statement, ExpressionStatement);
+                    let function =
+                        cast_into!(expression.expression.as_ref().unwrap(), FunctionLiteral);
+                    assert_eq!(function.parameters.len(), test.parameters.len());
+
+                    for parameter in function.parameters.iter() {
+                        let identifier = cast_into!(parameter, Identifier);
+                        assert_identifier_eq!(identifier, parameter.to_string());
+                    }
                 }
             }
         }
