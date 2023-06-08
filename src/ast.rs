@@ -8,9 +8,7 @@ pub trait Node: Any {
     fn as_any(&self) -> &dyn Any;
 }
 
-pub trait Statement: Node {
-    fn statement_node(&self);
-}
+pub trait Statement: Node {}
 
 pub trait Expression: Node {
     fn expression_node(&self);
@@ -99,9 +97,7 @@ pub struct LetStatement {
     pub value: Option<Box<dyn Expression>>,
 }
 
-impl Statement for LetStatement {
-    fn statement_node(&self) {}
-}
+impl Statement for LetStatement {}
 
 impl Node for LetStatement {
     fn token(&self) -> Token {
@@ -127,9 +123,7 @@ pub struct ReturnStatement {
     pub return_value: Option<Box<dyn Expression>>,
 }
 
-impl Statement for ReturnStatement {
-    fn statement_node(&self) {}
-}
+impl Statement for ReturnStatement {}
 
 impl Node for ReturnStatement {
     fn token(&self) -> Token {
@@ -154,9 +148,7 @@ pub struct ExpressionStatement {
     pub expression: Option<Box<dyn Expression>>,
 }
 
-impl Statement for ExpressionStatement {
-    fn statement_node(&self) {}
-}
+impl Statement for ExpressionStatement {}
 
 impl Node for ExpressionStatement {
     fn token(&self) -> Token {
@@ -318,9 +310,7 @@ pub struct BlockStatement {
     pub statements: Vec<Box<dyn Statement>>,
 }
 
-impl Statement for BlockStatement {
-    fn statement_node(&self) {}
-}
+impl Statement for BlockStatement {}
 
 impl Node for BlockStatement {
     fn token(&self) -> Token {
