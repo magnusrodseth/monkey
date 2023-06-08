@@ -1,4 +1,4 @@
-use std::any::Any;
+use std::{any::Any, fmt::Display};
 
 use crate::token::Token;
 
@@ -14,6 +14,12 @@ pub trait Expression: Node {}
 
 pub struct Program {
     pub statements: Vec<Box<dyn Statement>>,
+}
+
+impl Display for Program {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_string())
+    }
 }
 
 impl Program {

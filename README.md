@@ -53,3 +53,4 @@ This chapter finished with a very simple REPL, which prompts the user for input,
 - [ ] Support floating point numbers.
 - [ ] Flesh out the `Error` in the parser to contain more information about what kind of error occurred. That way, the user gets a much better compile time error.
 - [ ] Remove uneccessary empty method in the AST for `Expression`, `Statement`, etc.
+- [ ] Print colored and nice output to terminal when using the REPL. Thinking especially of the error messages.

@@ -1,30 +1,66 @@
 use std::io::Write;
 
-use crate::{lexer::Lexer, token::Token};
+use crate::{
+    lexer::Lexer,
+    parser::{Parser, ParserError},
+};
 
 const PROMPT: &str = ">> ";
+
+const MONKEY_ART: &str = r#"
+                        .="=.
+                      _/.-.-.\_     _
+                     ( ( o o ) )    ))
+                      |/  "  \|    //
+      .-------.        \'---'/    //
+     _|~~ ~~  |_       /`"""`\\  ((
+   =(_|_______|_)=    / /_,_\ \\  \\
+     |:::::::::|      \_\\_'__/ \  ))
+     |:::::::[]|       /`  /`~\  |//
+     |o=======.|      /   /    \  /
+     `"""""""""`  ,--`,--'\/\    /
+                   '-- "--'  '--'
+"#;
 
 pub struct Repl {}
 
 impl Repl {
-    pub fn start() {
-        print!("{}", PROMPT);
-        std::io::stdout().flush().unwrap();
+    fn print_errors(errors: Vec<ParserError>) {
+        println!("{}", MONKEY_ART);
 
+        println!("Woops! We ran into some monkey business here!");
+        println!("\t>> Parser errors:");
+        for error in errors {
+            println!("\t{}", error);
+        }
+    }
+
+    pub fn start() {
         loop {
+            print!("{}", PROMPT);
+            std::io::stdout().flush().unwrap();
+
             let mut input = String::new();
             std::io::stdin()
                 .read_line(&mut input)
                 .expect("Error reading line");
 
-            let mut lexer = Lexer::new(input);
+            let lexer = Lexer::new(input);
+            let mut parser = Parser::new(lexer);
+            let program = parser.parse();
 
-            loop {
-                let token = lexer.next_token();
-                if token == Token::EOF || token == Token::Illegal {
-                    break;
+            if parser.errors().len() > 0 {
+                Repl::print_errors(parser.errors());
+                continue;
+            }
+
+            match program {
+                Ok(program) => {
+                    println!("{}", program);
                 }
-                println!("{:?}", token);
+                Err(_) => {
+                    Repl::print_errors(parser.errors());
+                }
             }
         }
     }

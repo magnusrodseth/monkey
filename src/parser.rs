@@ -28,7 +28,7 @@ enum Precedence {
 }
 
 #[derive(Debug, Clone)]
-struct ParserError {
+pub struct ParserError {
     message: String,
 }
 
@@ -46,7 +46,7 @@ impl ParserError {
     }
 }
 
-struct Parser {
+pub struct Parser {
     lexer: Lexer,
     current_token: Token,
     peek_token: Token,
@@ -55,7 +55,7 @@ struct Parser {
 }
 
 impl Parser {
-    fn new(lexer: Lexer) -> Self {
+    pub fn new(lexer: Lexer) -> Self {
         let mut parser = Self {
             lexer,
             current_token: Token::EOF,
@@ -71,7 +71,7 @@ impl Parser {
         parser
     }
 
-    fn errors(&self) -> Vec<ParserError> {
+    pub fn errors(&self) -> Vec<ParserError> {
         self.errors.clone()
     }
 
@@ -104,7 +104,7 @@ impl Parser {
         self.peek_token = self.lexer.next_token();
     }
 
-    fn parse(&mut self) -> Result<Program, ParserError> {
+    pub fn parse(&mut self) -> Result<Program, ParserError> {
         let mut program = Program::new();
 
         while !self.current_token_is(Token::EOF) {
@@ -162,9 +162,11 @@ impl Parser {
         };
 
         if !self.peek_and_expect(Token::Assign) {
-            return Err(ParserError::new(
-                format!("Expected token to be `Assign`, got {}", self.peek_token).into(),
-            ));
+            return Err(ParserError::new(format!(
+                "Expected {:?} token, got {:?}",
+                Token::Assign.formatted(),
+                self.peek_token.formatted()
+            )));
         }
 
         self.next_token();
