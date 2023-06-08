@@ -263,7 +263,8 @@ impl Parser {
 mod tests {
     use super::*;
     use crate::ast::{
-        ExpressionStatement, IntegerLiteral, LetStatement, PrefixExpression, ReturnStatement,
+        ExpressionStatement, InfixExpression, IntegerLiteral, LetStatement, PrefixExpression,
+        ReturnStatement,
     };
 
     /// Casts an expression into a specific type, panicking if the cast fails.
@@ -304,12 +305,18 @@ mod tests {
         };
     }
 
-    macro_rules! handle_parser_errors {
+    macro_rules! print_parser_errors {
         ($errors:expr) => {
             for error in $errors {
                 println!("{}", error);
             }
-            panic!("Expected program, got error");
+        };
+    }
+
+    macro_rules! assert_integer_literal_eq {
+        ($integer_literal:expr, $expected_value:expr) => {
+            assert_eq!($integer_literal.value, $expected_value);
+            assert_eq!($integer_literal.token, Token::Integer($expected_value));
         };
     }
 
@@ -325,10 +332,11 @@ mod tests {
         let mut parser = Parser::new(lexer);
         let program = parser.parse();
         let expected_identifiers = vec!["x", "y", "foobar"];
+        print_parser_errors!(parser.errors());
 
         match program {
             Err(_) => {
-                handle_parser_errors!(parser.errors());
+                panic!("Parser error");
             }
             Ok(program) => {
                 assert_eq!(program.statements.len(), 3);
@@ -352,10 +360,11 @@ mod tests {
         let lexer = Lexer::new(input.into());
         let mut parser = Parser::new(lexer);
         let program = parser.parse();
+        print_parser_errors!(parser.errors());
 
         match program {
             Err(_) => {
-                handle_parser_errors!(parser.errors());
+                panic!("Parser error");
             }
             Ok(program) => {
                 assert_eq!(program.statements.len(), 3);
@@ -373,10 +382,11 @@ mod tests {
         let lexer = Lexer::new(input.into());
         let mut parser = Parser::new(lexer);
         let program = parser.parse();
+        print_parser_errors!(parser.errors());
 
         match program {
             Err(_) => {
-                handle_parser_errors!(parser.errors());
+                panic!("Parser error");
             }
             Ok(program) => {
                 assert_eq!(program.statements.len(), 1);
@@ -402,10 +412,11 @@ mod tests {
         let lexer = Lexer::new(input.into());
         let mut parser = Parser::new(lexer);
         let program = parser.parse();
+        print_parser_errors!(parser.errors());
 
         match program {
             Err(_) => {
-                handle_parser_errors!(parser.errors());
+                panic!("Parser error");
             }
             Ok(program) => {
                 assert_eq!(program.statements.len(), 1);
@@ -414,8 +425,7 @@ mod tests {
                     let expression = cast_into!(statement, ExpressionStatement);
                     if let Some(expr) = &expression.expression {
                         let integer = cast_into!(expr, IntegerLiteral);
-                        assert_eq!(integer.value, 5);
-                        assert_eq!(integer.token, Token::Integer(5));
+                        assert_integer_literal_eq!(integer, 5);
                     }
                 } else {
                     panic!("Expected statement, got something else");
@@ -446,10 +456,11 @@ mod tests {
             let lexer = Lexer::new(test.input.into());
             let mut parser = Parser::new(lexer);
             let program = parser.parse();
+            print_parser_errors!(parser.errors());
 
             match program {
                 Err(_) => {
-                    handle_parser_errors!(parser.errors());
+                    panic!("Parser error");
                 }
                 Ok(program) => {
                     assert_eq!(program.statements.len(), 1);
@@ -459,8 +470,102 @@ mod tests {
                         if let Some(expression) = &expression.expression {
                             let prefix = cast_into!(expression, PrefixExpression);
                             let integer = cast_into!(prefix.right, IntegerLiteral);
-                            assert_eq!(integer.value, test.integer_value);
-                            assert_eq!(integer.token, Token::Integer(test.integer_value));
+                            assert_integer_literal_eq!(integer, test.integer_value);
+                        }
+                    } else {
+                        panic!("Expected statement, got something else");
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn infex_expressions() {
+        struct InfixExpressionTest<'a> {
+            input: &'a str,
+            left_value: i64,
+            operator: &'a str,
+            right_value: i64,
+        }
+
+        let tests = vec![
+            InfixExpressionTest {
+                input: "5 + 5;",
+                left_value: 5,
+                operator: "+",
+                right_value: 5,
+            },
+            InfixExpressionTest {
+                input: "5 - 5;",
+                left_value: 5,
+                operator: "-",
+                right_value: 5,
+            },
+            InfixExpressionTest {
+                input: "5 * 5;",
+                left_value: 5,
+                operator: "*",
+                right_value: 5,
+            },
+            InfixExpressionTest {
+                input: "5 / 5;",
+                left_value: 5,
+                operator: "/",
+                right_value: 5,
+            },
+            InfixExpressionTest {
+                input: "5 > 5;",
+                left_value: 5,
+                operator: ">",
+                right_value: 5,
+            },
+            InfixExpressionTest {
+                input: "5 < 5;",
+                left_value: 5,
+                operator: "<",
+                right_value: 5,
+            },
+            InfixExpressionTest {
+                input: "5 == 5;",
+                left_value: 5,
+                operator: "==",
+                right_value: 5,
+            },
+            InfixExpressionTest {
+                input: "5 != 5;",
+                left_value: 5,
+                operator: "!=",
+                right_value: 5,
+            },
+        ];
+
+        for test in tests {
+            let lexer = Lexer::new(test.input.into());
+            let mut parser = Parser::new(lexer);
+            let program = parser.parse();
+            print_parser_errors!(parser.errors());
+
+            match program {
+                Err(_) => {
+                    panic!("Parser error");
+                }
+                Ok(program) => {
+                    assert_eq!(program.statements.len(), 1);
+
+                    if let Some(statement) = program.statements.first() {
+                        let expression = cast_into!(statement, ExpressionStatement);
+                        if let Some(expression) = &expression.expression {
+                            let infix = cast_into!(expression, InfixExpression);
+                            let left = cast_into!(infix.left, IntegerLiteral);
+                            assert_integer_literal_eq!(left, test.left_value);
+                            let right = cast_into!(infix.right, IntegerLiteral);
+                            assert_integer_literal_eq!(right, test.right_value);
+
+                            assert_eq!(infix.operator, test.operator);
+
+                            assert_eq!(right.value, test.right_value);
+                            assert_eq!(right.token, Token::Integer(test.right_value));
                         }
                     } else {
                         panic!("Expected statement, got something else");

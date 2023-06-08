@@ -202,6 +202,36 @@ impl Node for PrefixExpression {
     }
 }
 
+pub struct InfixExpression {
+    pub token: Token,
+    pub left: Box<dyn Expression>,
+    pub operator: String,
+    pub right: Box<dyn Expression>,
+}
+
+impl Expression for InfixExpression {
+    fn expression_node(&self) {}
+}
+
+impl Node for InfixExpression {
+    fn token(&self) -> Token {
+        self.token.clone()
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn to_string(&self) -> String {
+        format!(
+            "({} {} {})",
+            self.left.as_ref().to_string(),
+            self.operator,
+            self.right.as_ref().to_string()
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
