@@ -107,7 +107,7 @@ impl Parser {
 
     fn parse_identifier(&self) -> Option<Identifier> {
         match &self.current_token {
-            Token::Identifier(ref mut value) => Some(Identifier(value.clone())),
+            Token::Identifier(value) => Some(Identifier(value.clone())),
             _ => None,
         }
     }
@@ -276,9 +276,7 @@ impl Parser {
 
     fn parse_integer_literal(&self) -> Option<Expression> {
         match &self.current_token {
-            Token::Integer(ref mut value) => {
-                Some(Expression::Literal(Literal::Integer(value.clone())))
-            }
+            Token::Integer(value) => Some(Expression::Literal(Literal::Integer(value.clone()))),
             _ => None,
         }
     }

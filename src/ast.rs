@@ -3,7 +3,7 @@ use std::fmt::Display;
 #[derive(Debug, PartialEq, Eq, PartialOrd, Clone)]
 pub struct Identifier(pub String);
 
-#[derive(PartialEq, Clone, Debug)]
+#[derive(PartialEq, Eq, Clone, Debug)]
 pub enum Prefix {
     Plus,
     Minus,
@@ -20,7 +20,7 @@ impl Display for Prefix {
     }
 }
 
-#[derive(PartialEq, Clone, Debug)]
+#[derive(PartialEq, Eq, Clone, Debug)]
 pub enum Infix {
     Plus,
     Minus,
@@ -51,7 +51,7 @@ impl Display for Infix {
     }
 }
 
-#[derive(PartialEq, Clone, Debug)]
+#[derive(PartialEq, Clone, Eq, Debug)]
 pub enum Expression {
     Identifier(Identifier),
     Literal(Literal),
@@ -79,15 +79,49 @@ pub enum Expression {
     },
 }
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Clone)]
+impl Display for Expression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Expression::Identifier(Identifier(value)) => write!(f, "{}", value),
+            Expression::Literal(literal) => match literal {
+                Literal::Integer(integer) => write!(f, "{}", integer),
+                Literal::Boolean(boolean) => write!(f, "{}", boolean),
+                Literal::String(string) => write!(f, "{}", string),
+            },
+            Expression::Prefix { operator, right } => write!(f, "({}{})", operator, right),
+            Expression::Infix {
+                left,
+                operator,
+                right,
+            } => write!(f, "({} {} {})", left, operator, right),
+            Expression::If {
+                condition,
+                consequence,
+                alternative,
+            } => {
+                todo!()
+            }
+            Expression::Function { parameters, body } => {
+                todo!()
+            }
+            Expression::Call {
+                function,
+                arguments,
+            } => {
+                todo!()
+            }
+        }
+    }
+}
 
+#[derive(Debug, PartialEq, Eq, PartialOrd, Clone)]
 pub enum Literal {
     Integer(i64),
     Boolean(bool),
     String(String),
 }
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Statement {
     Let {
         identifier: Identifier,
@@ -111,7 +145,7 @@ impl Display for Statement {
     }
 }
 
-#[derive(PartialEq, Clone, Debug)]
+#[derive(PartialEq, Eq, Clone, Debug)]
 pub struct BlockStatement {
     pub statements: Vec<Statement>,
 }
