@@ -50,10 +50,14 @@ impl Lexer {
         }
     }
 
-    pub fn next_token(&mut self) -> Token {
+    fn skip_whitespace(&mut self) {
         while self.current_char.is_whitespace() {
             self.read_char();
         }
+    }
+
+    pub fn next_token(&mut self) -> Token {
+        self.skip_whitespace();
 
         let mut read_next_char = true;
 
@@ -68,8 +72,8 @@ impl Lexer {
             '*' => Token::Asterisk,
             '/' => Token::Slash,
             '!' => self.handle_peek('=', Token::NotEqual, Token::Bang),
-            '<' => Token::LessThan,
-            '>' => Token::GreaterThan,
+            '<' => self.handle_peek('=', Token::LessThanOrEqual, Token::LessThan),
+            '>' => self.handle_peek('=', Token::GreaterThanOrEqual, Token::GreaterThan),
             '{' => Token::LeftBrace,
             '}' => Token::RightBrace,
             EOF => Token::EOF,
@@ -107,8 +111,8 @@ impl Lexer {
         match identifier.as_str() {
             "fn" => Token::Function,
             "let" => Token::Let,
-            "true" => Token::True,
-            "false" => Token::False,
+            "true" => Token::Boolean(true),
+            "false" => Token::Boolean(false),
             "if" => Token::If,
             "else" => Token::Else,
             "return" => Token::Return,
@@ -265,13 +269,13 @@ mod tests {
             Token::RightParenthesis,
             Token::LeftBrace,
             Token::Return,
-            Token::True,
+            Token::Boolean(true),
             Token::Semicolon,
             Token::RightBrace,
             Token::Else,
             Token::LeftBrace,
             Token::Return,
-            Token::False,
+            Token::Boolean(false),
             Token::Semicolon,
             Token::RightBrace,
         ];

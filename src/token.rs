@@ -4,20 +4,29 @@ use std::fmt::{format, Display};
 pub enum Token {
     // Illegal and end of file
     Illegal,
+    Empty,
     EOF,
+
     // Identifiers and literals
     Identifier(String),
     Integer(i64),
+    Boolean(bool),
+
+    // Statements
+    Assign,
+    If,
+    Else,
 
     // Operators
     Plus,
-    Assign,
     Minus,
     Bang,
     Asterisk,
     Slash,
     GreaterThan,
     LessThan,
+    LessThanOrEqual,
+    GreaterThanOrEqual,
     Equal,
     NotEqual,
 
@@ -32,10 +41,6 @@ pub enum Token {
     // Keywords
     Function,
     Let,
-    True,
-    False,
-    If,
-    Else,
     Return,
 }
 
@@ -64,11 +69,13 @@ impl Token {
             Token::RightBrace => "}".into(),
             Token::Function => "fn".into(),
             Token::Let => "let".into(),
-            Token::True => "true".into(),
-            Token::False => "false".into(),
+            Token::Boolean(value) => format!("{}", value),
             Token::If => "if".into(),
             Token::Else => "else".into(),
             Token::Return => "return".into(),
+            Token::Empty => "".into(),
+            Token::LessThanOrEqual => "<=".into(),
+            Token::GreaterThanOrEqual => ">=".into(),
         }
     }
 }
@@ -98,11 +105,13 @@ impl Display for Token {
             Token::RightBrace => write!(f, "RightBrace"),
             Token::Function => write!(f, "Function"),
             Token::Let => write!(f, "Let"),
-            Token::True => write!(f, "True"),
-            Token::False => write!(f, "False"),
+            Token::Boolean(value) => write!(f, "{}", value),
             Token::If => write!(f, "If"),
             Token::Else => write!(f, "Else"),
             Token::Return => write!(f, "Return"),
+            Token::Empty => write!(f, "Empty"),
+            Token::LessThanOrEqual => write!(f, "LessThanOrEqual"),
+            Token::GreaterThanOrEqual => write!(f, "GreaterThanOrEqual"),
         }
     }
 }

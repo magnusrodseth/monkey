@@ -1,31 +1,13 @@
-use std::{collections::HashMap, error::Error, fmt::Display};
+use std::{error::Error, fmt::Display};
 
 use crate::{
     ast::{
-        BlockStatement, Boolean, CallExpression, Expression, ExpressionStatement, FunctionLiteral,
-        Identifier, IfExpression, InfixExpression, IntegerLiteral, LetStatement, PrefixExpression,
-        Program, ReturnStatement, Statement,
+        BlockStatement, Expression, Identifier, Infix, Literal, Precedence, Prefix, Program,
+        Statement,
     },
     lexer::Lexer,
     token::Token,
 };
-
-#[derive(Debug, PartialEq, Eq, PartialOrd, Clone)]
-enum Precedence {
-    Lowest,
-    /// ==
-    Equals,
-    /// > or <
-    LessThanOrGreaterThan,
-    /// +
-    Sum,
-    /// *
-    Product,
-    /// -X or !X
-    Prefix,
-    /// myFunction(X)
-    Call,
-}
 
 #[derive(Debug, Clone)]
 pub struct ParserError {
@@ -51,7 +33,6 @@ pub struct Parser {
     current_token: Token,
     peek_token: Token,
     errors: Vec<ParserError>,
-    precedences: HashMap<Token, Precedence>,
 }
 
 impl Parser {
@@ -61,7 +42,6 @@ impl Parser {
             current_token: Token::EOF,
             peek_token: Token::EOF,
             errors: Vec::new(),
-            precedences: Self::precedences(),
         };
 
         // Read two tokens, such that both `current_token` and `peek_token` are set
@@ -69,6 +49,20 @@ impl Parser {
         parser.next_token();
 
         parser
+    }
+
+    fn token_to_precedence(token: &Token) -> Precedence {
+        match token {
+            Token::Equal | Token::NotEqual => Precedence::Equals,
+            Token::LessThan
+            | Token::GreaterThan
+            | Token::LessThanOrEqual
+            | Token::GreaterThanOrEqual => Precedence::LessThanOrGreaterThan,
+            Token::Plus | Token::Minus => Precedence::Sum,
+            Token::Slash | Token::Asterisk => Precedence::Product,
+            Token::LeftParenthesis => Precedence::Call,
+            _ => Precedence::Lowest,
+        }
     }
 
     pub fn errors(&self) -> Vec<ParserError> {
@@ -84,19 +78,11 @@ impl Parser {
     }
 
     fn peek_precedence(&self) -> Precedence {
-        if let Some(precedence) = self.precedences.get(&self.peek_token) {
-            precedence.clone()
-        } else {
-            Precedence::Lowest
-        }
+        Self::token_to_precedence(&self.peek_token)
     }
 
     fn current_precedence(&self) -> Precedence {
-        if let Some(precedence) = self.precedences.get(&self.current_token) {
-            precedence.clone()
-        } else {
-            Precedence::Lowest
-        }
+        Self::token_to_precedence(&self.current_token)
     }
 
     fn next_token(&mut self) {
@@ -119,26 +105,30 @@ impl Parser {
         Ok(program)
     }
 
-    fn parse_identifier(&self) -> Option<Box<dyn Expression>> {
-        Some(Box::new(Identifier {
-            token: self.current_token.clone(),
-            value: if let Token::Identifier(value) = self.current_token.clone() {
-                value
-            } else {
-                return None;
-            },
-        }))
+    fn parse_identifier(&self) -> Option<Identifier> {
+        match &self.current_token {
+            Token::Identifier(ref mut value) => Some(Identifier(value.clone())),
+            _ => None,
+        }
     }
 
-    fn parse_statement(&mut self) -> Result<Box<dyn Statement>, ParserError> {
+    fn parse_identifier_expression(&mut self) -> Option<Expression> {
+        match self.parse_identifier() {
+            Some(identifier) => Some(Expression::Identifier(identifier)),
+            None => None,
+        }
+    }
+
+    fn parse_statement(&mut self) -> Result<Statement, ParserError> {
         match self.current_token {
             Token::Let => self.parse_let_statement(),
             Token::Return => self.parse_return_statement(),
+            Token::Empty => Ok(Statement::Empty),
             _ => self.parse_expression_statement(),
         }
     }
 
-    fn parse_let_statement(&mut self) -> Result<Box<dyn Statement>, ParserError> {
+    fn parse_let_statement(&mut self) -> Result<Statement, ParserError> {
         let token = self.current_token.clone();
 
         // Peek the value of the upcoming identifier. If this fails, then the let statement is invalid.
@@ -152,13 +142,9 @@ impl Parser {
             return Err(ParserError::new("Expected identifier".to_string()));
         }
 
-        let identifier = Identifier {
-            token: self.current_token.clone(),
-            value: if let Token::Identifier(value) = self.current_token.clone() {
-                value
-            } else {
-                return Err(ParserError::new("Expected identifier".to_string()));
-            },
+        let name = match self.parse_identifier() {
+            Some(name) => name,
+            None => return Err(ParserError::new("Expected identifier".to_string())),
         };
 
         if !self.peek_and_expect(Token::Assign) {
@@ -171,17 +157,19 @@ impl Parser {
 
         self.next_token();
 
-        let value = self.parse_expression(Precedence::Lowest);
+        let value = match self.parse_expression(Precedence::Lowest) {
+            Some(value) => value,
+            None => return Err(ParserError::new("Expected expression".to_string())),
+        };
 
         if self.peek_token_is(&Token::Semicolon) {
             self.next_token();
         }
 
-        Ok(Box::new(LetStatement {
-            token,
-            name: identifier,
+        Ok(Statement::Let {
+            identifier: name,
             value,
-        }))
+        })
     }
 
     fn peek_and_expect(&mut self, token: Token) -> bool {
@@ -201,24 +189,22 @@ impl Parser {
         self.peek_token == *token
     }
 
-    fn parse_return_statement(&mut self) -> Result<Box<dyn Statement>, ParserError> {
-        let token = self.current_token.clone();
-
+    fn parse_return_statement(&mut self) -> Result<Statement, ParserError> {
         self.next_token();
 
-        let return_value = self.parse_expression(Precedence::Lowest);
+        let return_expression = match self.parse_expression(Precedence::Lowest) {
+            Some(expression) => expression,
+            None => return Err(ParserError::new("Expected expression".to_string())),
+        };
 
         if self.peek_token_is(&Token::Semicolon) {
             self.next_token();
         }
 
-        Ok(Box::new(ReturnStatement {
-            token,
-            return_value,
-        }))
+        Ok(Statement::Return(return_expression))
     }
 
-    fn parse_expression_statement(&mut self) -> Result<Box<dyn Statement>, ParserError> {
+    fn parse_expression_statement(&mut self) -> Result<Statement, ParserError> {
         let expression = self.parse_expression(Precedence::Lowest);
 
         match expression {
@@ -227,10 +213,7 @@ impl Parser {
                     self.next_token();
                 }
 
-                Ok(Box::new(ExpressionStatement {
-                    token: self.current_token.clone(),
-                    expression: Some(expression),
-                }))
+                Ok(Statement::Expression(expression))
             }
             None => Err(ParserError::new(
                 format!(
@@ -242,13 +225,13 @@ impl Parser {
         }
     }
 
-    fn parse_expression(&mut self, precedence: Precedence) -> Option<Box<dyn Expression>> {
+    fn parse_expression(&mut self, precedence: Precedence) -> Option<Expression> {
         // Parse prefix
         let mut left = match self.current_token {
+            Token::Identifier(_) => self.parse_identifier_expression(),
             Token::Integer(_) => self.parse_integer_literal(),
-            Token::Identifier(_) => self.parse_identifier(),
+            Token::Boolean(_) => self.parse_boolean(),
             Token::Bang | Token::Minus | Token::Plus => self.parse_prefix(),
-            Token::True | Token::False => self.parse_boolean(),
             Token::LeftParenthesis => self.parse_grouped_expression(),
             Token::If => self.parse_if_expression(),
             Token::Function => self.parse_function_literal(),
@@ -266,17 +249,24 @@ impl Parser {
 
         // Parse infix
         while !self.peek_token_is(&Token::Semicolon) && precedence < self.peek_precedence() {
-            match self.precedences.get(&self.peek_token) {
-                Some(precedence) => match precedence {
-                    Precedence::Call => {
-                        self.next_token();
-                        left = self.parse_call_expression(left.expect("Expected left expression"));
-                    }
-                    _ => {
-                        self.next_token();
-                        left = self.parse_infix(left.expect("Expected left expression"));
-                    }
-                },
+            match self.peek_token {
+                Token::Plus
+                | Token::Minus
+                | Token::Slash
+                | Token::Asterisk
+                | Token::Equal
+                | Token::NotEqual
+                | Token::LessThan
+                | Token::LessThanOrEqual
+                | Token::GreaterThan
+                | Token::GreaterThanOrEqual => {
+                    self.next_token();
+                    left = self.parse_infix(left.expect("Expected left expression"));
+                }
+                Token::LeftParenthesis => {
+                    self.next_token();
+                    left = self.parse_call_expression(left.expect("Expected left expression"));
+                }
                 _ => return left,
             }
         }
@@ -284,19 +274,23 @@ impl Parser {
         left
     }
 
-    fn parse_integer_literal(&self) -> Option<Box<dyn Expression>> {
-        let token = self.current_token.clone();
-
-        let value = if let Token::Integer(value) = self.current_token.clone() {
-            value
-        } else {
-            return None;
-        };
-
-        Some(Box::new(IntegerLiteral { token, value }))
+    fn parse_integer_literal(&self) -> Option<Expression> {
+        match &self.current_token {
+            Token::Integer(ref mut value) => {
+                Some(Expression::Literal(Literal::Integer(value.clone())))
+            }
+            _ => None,
+        }
     }
 
-    fn parse_prefix(&mut self) -> Option<Box<dyn Expression>> {
+    fn parse_prefix(&mut self) -> Option<Expression> {
+        let operator = match self.current_token {
+            Token::Bang => Prefix::Not,
+            Token::Minus => Prefix::Minus,
+            Token::Plus => Prefix::Plus,
+            _ => return None,
+        };
+
         let token = self.current_token.clone();
 
         self.next_token();
@@ -304,51 +298,51 @@ impl Parser {
         let right = self.parse_expression(Precedence::Prefix);
 
         match right {
-            Some(right) => Some(Box::new(PrefixExpression { token, right })),
+            Some(right) => Some(Expression::Prefix {
+                operator,
+                right: Box::new(right),
+            }),
             None => None,
         }
     }
 
-    fn parse_infix(&mut self, left: Box<dyn Expression>) -> Option<Box<dyn Expression>> {
-        let token = self.current_token.clone();
+    fn parse_infix(&mut self, left: Expression) -> Option<Expression> {
+        let operator = match self.current_token {
+            Token::Plus => Infix::Plus,
+            Token::Minus => Infix::Minus,
+            Token::Slash => Infix::Divide,
+            Token::Asterisk => Infix::Multiply,
+            Token::Equal => Infix::Equal,
+            Token::NotEqual => Infix::NotEqual,
+            Token::LessThan => Infix::LessThan,
+            Token::LessThanOrEqual => Infix::LessThanOrEqual,
+            Token::GreaterThan => Infix::GreaterThan,
+            Token::GreaterThanOrEqual => Infix::GreaterThanOrEqual,
+            _ => return None,
+        };
+
         let precedence = self.current_precedence();
         self.next_token();
         let right = self.parse_expression(precedence);
 
         match right {
-            Some(right) => Some(Box::new(InfixExpression { token, left, right })),
+            Some(right) => Some(Expression::Infix {
+                left: Box::new(left),
+                operator,
+                right: Box::new(right),
+            }),
             None => None,
         }
     }
 
-    fn precedences() -> HashMap<Token, Precedence> {
-        let mut precedences = HashMap::new();
-
-        precedences.insert(Token::Equal, Precedence::Equals);
-        precedences.insert(Token::NotEqual, Precedence::Equals);
-
-        precedences.insert(Token::LessThan, Precedence::LessThanOrGreaterThan);
-        precedences.insert(Token::GreaterThan, Precedence::LessThanOrGreaterThan);
-
-        precedences.insert(Token::Plus, Precedence::Sum);
-        precedences.insert(Token::Minus, Precedence::Sum);
-
-        precedences.insert(Token::Slash, Precedence::Product);
-        precedences.insert(Token::Asterisk, Precedence::Product);
-
-        precedences.insert(Token::LeftParenthesis, Precedence::Call);
-
-        precedences
+    fn parse_boolean(&self) -> Option<Expression> {
+        match self.current_token {
+            Token::Boolean(value) => Some(Expression::Literal(Literal::Boolean(value))),
+            _ => None,
+        }
     }
 
-    fn parse_boolean(&self) -> Option<Box<dyn Expression>> {
-        Some(Box::new(Boolean {
-            token: self.current_token.clone(),
-            value: self.current_token_is(Token::True),
-        }))
-    }
-
-    fn parse_grouped_expression(&mut self) -> Option<Box<dyn Expression>> {
+    fn parse_grouped_expression(&mut self) -> Option<Expression> {
         self.next_token();
 
         let expression = self.parse_expression(Precedence::Lowest);
@@ -360,16 +354,17 @@ impl Parser {
         expression
     }
 
-    fn parse_if_expression(&mut self) -> Option<Box<dyn Expression>> {
-        let token = self.current_token.clone();
-
+    fn parse_if_expression(&mut self) -> Option<Expression> {
         if !self.peek_and_expect(Token::LeftParenthesis) {
             return None;
         }
 
         self.next_token();
 
-        let condition = self.parse_expression(Precedence::Lowest);
+        let condition = match self.parse_expression(Precedence::Lowest) {
+            Some(condition) => condition,
+            None => return None,
+        };
 
         if !self.peek_and_expect(Token::RightParenthesis) {
             return None;
@@ -380,6 +375,7 @@ impl Parser {
         }
 
         let consequence = self.parse_block_statement();
+        let mut alternative = None;
 
         if self.peek_token_is(&Token::Else) {
             self.next_token();
@@ -388,26 +384,17 @@ impl Parser {
                 return None;
             }
 
-            let alternative = self.parse_block_statement();
-
-            return Some(Box::new(IfExpression {
-                token,
-                condition: condition.expect("Expected condition"),
-                consequence,
-                alternative: Some(alternative),
-            }));
+            alternative = Some(self.parse_block_statement());
         }
 
-        Some(Box::new(IfExpression {
-            token,
-            condition: condition.expect("Expected condition"),
+        Some(Expression::If {
+            condition: Box::new(condition),
             consequence,
-            alternative: None,
-        }))
+            alternative,
+        })
     }
 
     fn parse_block_statement(&mut self) -> BlockStatement {
-        let token = self.current_token.clone();
         let mut statements = Vec::new();
 
         self.next_token();
@@ -421,12 +408,10 @@ impl Parser {
             self.next_token();
         }
 
-        BlockStatement { token, statements }
+        BlockStatement { statements }
     }
 
-    fn parse_function_literal(&mut self) -> Option<Box<dyn Expression>> {
-        let token = self.current_token.clone();
-
+    fn parse_function_literal(&mut self) -> Option<Expression> {
         if !self.peek_and_expect(Token::LeftParenthesis) {
             return None;
         }
@@ -439,11 +424,7 @@ impl Parser {
 
         let body = self.parse_block_statement();
 
-        Some(Box::new(FunctionLiteral {
-            token,
-            parameters,
-            body,
-        }))
+        Some(Expression::Function { parameters, body })
     }
 
     fn parse_function_parameters(&mut self) -> Vec<Identifier> {
@@ -456,29 +437,19 @@ impl Parser {
 
         self.next_token();
 
-        let identifier = Identifier {
-            token: self.current_token.clone(),
-            value: if let Token::Identifier(value) = self.current_token.clone() {
-                value
-            } else {
-                return identifiers;
-            },
-        };
-        identifiers.push(identifier);
+        match self.parse_identifier() {
+            Some(identifier) => identifiers.push(identifier),
+            None => return Vec::new(),
+        }
 
         while self.peek_token_is(&Token::Comma) {
             self.next_token();
             self.next_token();
 
-            let identifier = Identifier {
-                token: self.current_token.clone(),
-                value: if let Token::Identifier(value) = self.current_token.clone() {
-                    value
-                } else {
-                    return identifiers;
-                },
-            };
-            identifiers.push(identifier);
+            match self.parse_identifier() {
+                Some(identifier) => identifiers.push(identifier),
+                None => return Vec::new(),
+            }
         }
 
         if !self.peek_and_expect(Token::RightParenthesis) {
@@ -488,118 +459,60 @@ impl Parser {
         identifiers
     }
 
-    fn parse_call_expression(
-        &mut self,
-        function: Box<dyn Expression>,
-    ) -> Option<Box<dyn Expression>> {
-        let token = self.current_token.clone();
-        let arguments = self.parse_call_arguments();
+    fn parse_call_expression(&mut self, function: Expression) -> Option<Expression> {
+        let arguments = match self.parse_call_arguments() {
+            Some(arguments) => arguments,
+            None => return None,
+        };
 
-        Some(Box::new(CallExpression {
-            token,
-            function,
+        Some(Expression::Call {
+            function: Box::new(function),
             arguments,
-        }))
+        })
     }
 
-    fn parse_call_arguments(&mut self) -> Vec<Box<dyn Expression>> {
+    fn parse_call_arguments(&mut self) -> Option<Vec<Expression>> {
         let mut arguments = Vec::new();
 
         if self.peek_token_is(&Token::RightParenthesis) {
             self.next_token();
-            return arguments;
+            return None;
         }
 
         self.next_token();
 
-        let expression = self
-            .parse_expression(Precedence::Lowest)
-            .expect("Expected expression");
-        arguments.push(expression);
+        match self.parse_expression(Precedence::Lowest) {
+            Some(expression) => arguments.push(expression),
+            None => return None,
+        };
 
         while self.peek_token_is(&Token::Comma) {
             self.next_token();
             self.next_token();
 
-            let expression = self
-                .parse_expression(Precedence::Lowest)
-                .expect("Expected expression");
-            arguments.push(expression);
+            match self.parse_expression(Precedence::Lowest) {
+                Some(expression) => arguments.push(expression),
+                None => return None,
+            };
         }
 
         if !self.peek_and_expect(Token::RightParenthesis) {
-            return Vec::new();
+            return None;
         }
 
-        arguments
+        Some(arguments)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ast::{
-        BlockStatement, CallExpression, ExpressionStatement, FunctionLiteral, IfExpression,
-        InfixExpression, IntegerLiteral, LetStatement, Node, PrefixExpression, ReturnStatement,
-    };
-
-    /// Casts an expression into a specific type, panicking if the cast fails.
-    macro_rules! cast_into {
-        ($expr:expr, $expected_type:ty) => {
-            if let Some(expr) = $expr.as_any().downcast_ref::<$expected_type>() {
-                expr
-            } else {
-                panic!(
-                    "Expected {}, got something else",
-                    stringify!($expected_type)
-                );
-            }
-        };
-    }
-
-    macro_rules! assert_let_statement_eq {
-        ($let_statement:expr, $expected_identifier:expr) => {
-            assert_eq!($let_statement.token(), Token::Let);
-
-            // Cast the statement to any and then downcast
-            let let_statement = cast_into!($let_statement, LetStatement);
-            assert_eq!(let_statement.name.value, $expected_identifier.to_string());
-            assert_eq!(
-                let_statement.name.token,
-                Token::Identifier($expected_identifier.to_string())
-            );
-        };
-    }
-
-    macro_rules! assert_return_statement_eq {
-        ($return_statement:expr) => {
-            assert_eq!($return_statement.token(), Token::Return);
-
-            // Cast the statement to any and then downcast
-            let return_statement = cast_into!($return_statement, ReturnStatement);
-            assert_eq!(return_statement.token, Token::Return);
-        };
-    }
 
     macro_rules! print_parser_errors {
         ($errors:expr) => {
             for error in $errors {
                 println!("{}", error);
             }
-        };
-    }
-
-    macro_rules! assert_integer_literal_eq {
-        ($integer_literal:expr, $expected_value:expr) => {
-            assert_eq!($integer_literal.value, $expected_value);
-            assert_eq!($integer_literal.token, Token::Integer($expected_value));
-        };
-    }
-
-    macro_rules! assert_identifier_eq {
-        ($identifier:expr, $expected_value:expr) => {
-            assert_eq!($identifier.value, $expected_value);
-            assert_eq!($identifier.token, Token::Identifier($expected_value));
         };
     }
 
@@ -611,10 +524,25 @@ mod tests {
             let foobar = 838383;
         ";
 
+        let expected = vec![
+            Statement::Let {
+                identifier: Identifier("x".into()),
+                value: Expression::Literal(Literal::Integer(5)),
+            },
+            Statement::Let {
+                identifier: Identifier("y".into()),
+                value: Expression::Literal(Literal::Integer(10)),
+            },
+            Statement::Let {
+                identifier: Identifier("foobar".into()),
+                value: Expression::Literal(Literal::Integer(838383)),
+            },
+        ];
+
         let lexer = Lexer::new(input.to_string());
         let mut parser = Parser::new(lexer);
         let program = parser.parse();
-        let expected_identifiers = vec!["x", "y", "foobar"];
+
         print_parser_errors!(parser.errors());
 
         match program {
@@ -624,9 +552,9 @@ mod tests {
             Ok(program) => {
                 assert_eq!(program.statements.len(), 3);
 
-                for (i, expected_identifier) in expected_identifiers.iter().enumerate() {
+                for (i, expected_identifier) in expected.iter().enumerate() {
                     let statement = &program.statements[i];
-                    assert_let_statement_eq!(statement, expected_identifier);
+                    assert_eq!(statement, expected_identifier);
                 }
             }
         }
@@ -640,6 +568,12 @@ mod tests {
             return 993322;
         ";
 
+        let expected = vec![
+            Statement::Return(Expression::Literal(Literal::Integer(5))),
+            Statement::Return(Expression::Literal(Literal::Integer(10))),
+            Statement::Return(Expression::Literal(Literal::Integer(993322))),
+        ];
+
         let lexer = Lexer::new(input.into());
         let mut parser = Parser::new(lexer);
         let program = parser.parse();
@@ -652,8 +586,9 @@ mod tests {
             Ok(program) => {
                 assert_eq!(program.statements.len(), 3);
 
-                for statement in program.statements {
-                    assert_return_statement_eq!(statement);
+                for (i, expected_return) in expected.iter().enumerate() {
+                    let statement = &program.statements[i];
+                    assert_eq!(statement, expected_return);
                 }
             }
         }
@@ -662,9 +597,12 @@ mod tests {
     #[test]
     fn identifier_as_expression() {
         let input = "foobar;";
+        let expected = Statement::Expression(Expression::Identifier(Identifier("foobar".into())));
+
         let lexer = Lexer::new(input.into());
         let mut parser = Parser::new(lexer);
         let program = parser.parse();
+
         print_parser_errors!(parser.errors());
 
         match program {
@@ -673,16 +611,8 @@ mod tests {
             }
             Ok(program) => {
                 assert_eq!(program.statements.len(), 1);
-
-                if let Some(statement) = program.statements.first() {
-                    let expression = cast_into!(statement, ExpressionStatement);
-                    if let Some(expr) = &expression.expression {
-                        let identifier = cast_into!(expr, Identifier);
-                        assert_identifier_eq!(identifier, "foobar".to_string());
-                    }
-                } else {
-                    panic!("Expected statement, got something else");
-                }
+                let statement = &program.statements[0];
+                assert_eq!(statement, &expected);
             }
         }
     }
@@ -690,6 +620,7 @@ mod tests {
     #[test]
     fn integer_literal_as_expression() {
         let input = "5;";
+        let expected = Statement::Expression(Expression::Literal(Literal::Integer(5)));
 
         let lexer = Lexer::new(input.into());
         let mut parser = Parser::new(lexer);
@@ -702,16 +633,8 @@ mod tests {
             }
             Ok(program) => {
                 assert_eq!(program.statements.len(), 1);
-
-                if let Some(statement) = program.statements.first() {
-                    let expression = cast_into!(statement, ExpressionStatement);
-                    if let Some(expr) = &expression.expression {
-                        let integer = cast_into!(expr, IntegerLiteral);
-                        assert_integer_literal_eq!(integer, 5);
-                    }
-                } else {
-                    panic!("Expected statement, got something else");
-                }
+                let statement = &program.statements[0];
+                assert_eq!(statement, &expected);
             }
         }
     }
@@ -720,17 +643,23 @@ mod tests {
     fn prefix_expressions() {
         struct PrefixExpressionTest<'a> {
             input: &'a str,
-            integer_value: i64,
+            expected: Statement,
         }
 
         let tests = vec![
             PrefixExpressionTest {
                 input: "!5;",
-                integer_value: 5,
+                expected: Statement::Expression(Expression::Prefix {
+                    operator: Prefix::Not,
+                    right: Box::new(Expression::Literal(Literal::Integer(5))),
+                }),
             },
             PrefixExpressionTest {
                 input: "-15;",
-                integer_value: 15,
+                expected: Statement::Expression(Expression::Prefix {
+                    operator: Prefix::Minus,
+                    right: Box::new(Expression::Literal(Literal::Integer(15))),
+                }),
             },
         ];
 
@@ -746,17 +675,8 @@ mod tests {
                 }
                 Ok(program) => {
                     assert_eq!(program.statements.len(), 1);
-
-                    if let Some(statement) = program.statements.first() {
-                        let expression = cast_into!(statement, ExpressionStatement);
-                        if let Some(expression) = &expression.expression {
-                            let prefix = cast_into!(expression, PrefixExpression);
-                            let integer = cast_into!(prefix.right, IntegerLiteral);
-                            assert_integer_literal_eq!(integer, test.integer_value);
-                        }
-                    } else {
-                        panic!("Expected statement, got something else");
-                    }
+                    let statement = &program.statements[0];
+                    assert_eq!(*statement, test.expected);
                 }
             }
         }
@@ -766,59 +686,73 @@ mod tests {
     fn infix_expressions() {
         struct InfixExpressionTest<'a> {
             input: &'a str,
-            left_value: i64,
-            operator: &'a str,
-            right_value: i64,
+            expected: Statement,
         }
 
         let tests = vec![
             InfixExpressionTest {
                 input: "5 + 5;",
-                left_value: 5,
-                operator: "+",
-                right_value: 5,
+                expected: Statement::Expression(Expression::Infix {
+                    operator: Infix::Plus,
+                    left: Box::new(Expression::Literal(Literal::Integer(5))),
+                    right: Box::new(Expression::Literal(Literal::Integer(5))),
+                }),
             },
             InfixExpressionTest {
                 input: "5 - 5;",
-                left_value: 5,
-                operator: "-",
-                right_value: 5,
+                expected: Statement::Expression(Expression::Infix {
+                    operator: Infix::Minus,
+                    left: Box::new(Expression::Literal(Literal::Integer(5))),
+                    right: Box::new(Expression::Literal(Literal::Integer(5))),
+                }),
             },
             InfixExpressionTest {
                 input: "5 * 5;",
-                left_value: 5,
-                operator: "*",
-                right_value: 5,
+                expected: Statement::Expression(Expression::Infix {
+                    operator: Infix::Multiply,
+                    left: Box::new(Expression::Literal(Literal::Integer(5))),
+                    right: Box::new(Expression::Literal(Literal::Integer(5))),
+                }),
             },
             InfixExpressionTest {
                 input: "5 / 5;",
-                left_value: 5,
-                operator: "/",
-                right_value: 5,
+                expected: Statement::Expression(Expression::Infix {
+                    operator: Infix::Divide,
+                    left: Box::new(Expression::Literal(Literal::Integer(5))),
+                    right: Box::new(Expression::Literal(Literal::Integer(5))),
+                }),
             },
             InfixExpressionTest {
                 input: "5 > 5;",
-                left_value: 5,
-                operator: ">",
-                right_value: 5,
+                expected: Statement::Expression(Expression::Infix {
+                    operator: Infix::GreaterThan,
+                    left: Box::new(Expression::Literal(Literal::Integer(5))),
+                    right: Box::new(Expression::Literal(Literal::Integer(5))),
+                }),
             },
             InfixExpressionTest {
                 input: "5 < 5;",
-                left_value: 5,
-                operator: "<",
-                right_value: 5,
+                expected: Statement::Expression(Expression::Infix {
+                    operator: Infix::LessThan,
+                    left: Box::new(Expression::Literal(Literal::Integer(5))),
+                    right: Box::new(Expression::Literal(Literal::Integer(5))),
+                }),
             },
             InfixExpressionTest {
                 input: "5 == 5;",
-                left_value: 5,
-                operator: "==",
-                right_value: 5,
+                expected: Statement::Expression(Expression::Infix {
+                    operator: Infix::Equal,
+                    left: Box::new(Expression::Literal(Literal::Integer(5))),
+                    right: Box::new(Expression::Literal(Literal::Integer(5))),
+                }),
             },
             InfixExpressionTest {
                 input: "5 != 5;",
-                left_value: 5,
-                operator: "!=",
-                right_value: 5,
+                expected: Statement::Expression(Expression::Infix {
+                    operator: Infix::NotEqual,
+                    left: Box::new(Expression::Literal(Literal::Integer(5))),
+                    right: Box::new(Expression::Literal(Literal::Integer(5))),
+                }),
             },
         ];
 
@@ -834,23 +768,8 @@ mod tests {
                 }
                 Ok(program) => {
                     assert_eq!(program.statements.len(), 1);
-
-                    if let Some(statement) = program.statements.first() {
-                        let expression = cast_into!(statement, ExpressionStatement);
-                        if let Some(expression) = &expression.expression {
-                            let infix = cast_into!(expression, InfixExpression);
-                            let left = cast_into!(infix.left, IntegerLiteral);
-                            assert_integer_literal_eq!(left, test.left_value);
-                            let right = cast_into!(infix.right, IntegerLiteral);
-                            assert_integer_literal_eq!(right, test.right_value);
-
-                            assert_eq!(infix.token.formatted(), test.operator);
-
-                            assert_integer_literal_eq!(left, test.left_value);
-                        }
-                    } else {
-                        panic!("Expected statement, got something else");
-                    }
+                    let statement = &program.statements[0];
+                    assert_eq!(*statement, test.expected);
                 }
             }
         }
@@ -979,51 +898,22 @@ mod tests {
         }
     }
 
-    macro_rules! assert_if_else_eq {
-        ($expression:expr, $condition:expr, $consequence:expr, $alternative:expr, $has_alternative:expr) => {
-            let if_expression = cast_into!($expression, IfExpression);
-            let condition = cast_into!(if_expression.condition, InfixExpression);
-            assert_eq!(condition.to_string(), $condition);
-
-            let consequence = cast_into!(if_expression.consequence, BlockStatement);
-            assert_eq!(consequence.statements.len(), 1);
-
-            let consequence_expression =
-                cast_into!(consequence.statements.first().unwrap(), ExpressionStatement);
-            let consequence_identifier = cast_into!(
-                consequence_expression.expression.as_ref().unwrap(),
-                Identifier
-            );
-            assert_identifier_eq!(consequence_identifier, $consequence);
-
-            if $has_alternative {
-                assert!(if_expression.alternative.is_some());
-
-                let alternative =
-                    cast_into!(if_expression.alternative.as_ref().unwrap(), BlockStatement);
-
-                assert_eq!(alternative.statements.len(), 1);
-                let alternative_statement = alternative.statements.first();
-                if let Some(alternative_statement) = alternative_statement {
-                    let alternative = cast_into!(alternative_statement, ExpressionStatement);
-                    if let Some(expression) = &alternative.expression {
-                        let alternative_identifier = cast_into!(expression, Identifier);
-                        assert_identifier_eq!(alternative_identifier, "y".to_string());
-                    } else {
-                        panic!("Expected statement, got something else");
-                    }
-                } else {
-                    panic!("Expected statement, got something else");
-                }
-            } else {
-                assert!(if_expression.alternative.is_none());
-            }
-        };
-    }
-
     #[test]
     fn simple_if() {
         let input = "if (x < y) { x }";
+        let expected = Statement::Expression(Expression::If {
+            condition: Box::new(Expression::Infix {
+                left: Box::new(Expression::Identifier(Identifier("x".to_string()))),
+                operator: Infix::LessThan,
+                right: Box::new(Expression::Identifier(Identifier("y".to_string()))),
+            }),
+            consequence: BlockStatement {
+                statements: vec![Statement::Expression(Expression::Identifier(Identifier(
+                    "x".to_string(),
+                )))],
+            },
+            alternative: None,
+        });
 
         let lexer = Lexer::new(input.into());
         let mut parser = Parser::new(lexer);
@@ -1038,19 +928,7 @@ mod tests {
             Ok(program) => {
                 assert_eq!(program.statements.len(), 1);
                 let statement = program.statements.first().unwrap();
-                let expression = cast_into!(statement, ExpressionStatement);
-
-                if let Some(if_expression) = &expression.expression {
-                    assert_if_else_eq!(
-                        if_expression,
-                        "(x < y)".to_string(),
-                        "x".to_string(),
-                        "".to_string(),
-                        false
-                    );
-                } else {
-                    panic!("Expected expression, got something else");
-                }
+                assert_eq!(statement, &expected);
             }
         }
     }
@@ -1059,6 +937,24 @@ mod tests {
     fn if_else() {
         let input = "if (x < y) { x } else { y }";
 
+        let expected = Statement::Expression(Expression::If {
+            condition: Box::new(Expression::Infix {
+                left: Box::new(Expression::Identifier(Identifier("x".to_string()))),
+                operator: Infix::LessThan,
+                right: Box::new(Expression::Identifier(Identifier("y".to_string()))),
+            }),
+            consequence: BlockStatement {
+                statements: vec![Statement::Expression(Expression::Identifier(Identifier(
+                    "x".to_string(),
+                )))],
+            },
+            alternative: Some(BlockStatement {
+                statements: vec![Statement::Expression(Expression::Identifier(Identifier(
+                    "y".to_string(),
+                )))],
+            }),
+        });
+
         let lexer = Lexer::new(input.into());
         let mut parser = Parser::new(lexer);
         let program = parser.parse();
@@ -1073,19 +969,7 @@ mod tests {
                 assert_eq!(program.statements.len(), 1);
 
                 let statement = program.statements.first().unwrap();
-                let expression = cast_into!(statement, ExpressionStatement);
-
-                if let Some(if_expression) = &expression.expression {
-                    assert_if_else_eq!(
-                        if_expression,
-                        "(x < y)".to_string(),
-                        "x".to_string(),
-                        "y".to_string(),
-                        true
-                    );
-                } else {
-                    panic!("Expected expression, got something else");
-                }
+                assert_eq!(statement, &expected);
             }
         }
     }
@@ -1094,6 +978,17 @@ mod tests {
     fn function_literal() {
         let input = "fn(x, y) { x + y; }";
 
+        let expected = Statement::Expression(Expression::Function {
+            parameters: vec![Identifier("x".to_string()), Identifier("y".to_string())],
+            body: BlockStatement {
+                statements: vec![Statement::Expression(Expression::Infix {
+                    left: Box::new(Expression::Identifier(Identifier("x".to_string()))),
+                    operator: Infix::Plus,
+                    right: Box::new(Expression::Identifier(Identifier("y".to_string()))),
+                })],
+            },
+        });
+
         let lexer = Lexer::new(input.into());
         let mut parser = Parser::new(lexer);
         let program = parser.parse();
@@ -1106,33 +1001,8 @@ mod tests {
             }
             Ok(program) => {
                 assert_eq!(program.statements.len(), 1);
-
                 let statement = program.statements.first().unwrap();
-                let expression = cast_into!(statement, ExpressionStatement);
-                let function = cast_into!(expression.expression.as_ref().unwrap(), FunctionLiteral);
-                assert_eq!(function.parameters.len(), 2);
-
-                let first_parameter = cast_into!(function.parameters.first().unwrap(), Identifier);
-                assert_identifier_eq!(first_parameter, "x".to_string());
-
-                let second_parameter = cast_into!(function.parameters.last().unwrap(), Identifier);
-                assert_identifier_eq!(second_parameter, "y".to_string());
-
-                let body = cast_into!(function.body, BlockStatement);
-                assert_eq!(body.statements.len(), 1);
-
-                let body_statement = body.statements.first().unwrap();
-                let body_expression = cast_into!(body_statement, ExpressionStatement);
-                let body_infix_expression = cast_into!(
-                    body_expression.expression.as_ref().unwrap(),
-                    InfixExpression
-                );
-                let left = cast_into!(body_infix_expression.left, Identifier);
-                let right = cast_into!(body_infix_expression.right, Identifier);
-
-                assert_eq!(body_infix_expression.token.formatted(), "+".to_string());
-                assert_identifier_eq!(left, "x".to_string());
-                assert_identifier_eq!(right, "y".to_string());
+                assert_eq!(statement, &expected);
             }
         }
     }
@@ -1141,7 +1011,7 @@ mod tests {
     fn function_parameters() {
         struct Test<'a> {
             input: &'a str,
-            parameters: Vec<&'a str>,
+            parameters: Vec<Identifier>,
         }
 
         let tests = vec![
@@ -1151,11 +1021,15 @@ mod tests {
             },
             Test {
                 input: "fn(x) {};",
-                parameters: vec!["x"],
+                parameters: vec![Identifier("x".to_string())],
             },
             Test {
                 input: "fn(x, y, z) {};",
-                parameters: vec!["x", "y", "z"],
+                parameters: vec![
+                    Identifier("x".to_string()),
+                    Identifier("y".to_string()),
+                    Identifier("z".to_string()),
+                ],
             },
         ];
 
@@ -1172,17 +1046,15 @@ mod tests {
                 }
                 Ok(program) => {
                     assert_eq!(program.statements.len(), 1);
-
                     let statement = program.statements.first().unwrap();
-                    let expression = cast_into!(statement, ExpressionStatement);
-                    let function =
-                        cast_into!(expression.expression.as_ref().unwrap(), FunctionLiteral);
-                    assert_eq!(function.parameters.len(), test.parameters.len());
 
-                    for parameter in function.parameters.iter() {
-                        let identifier = cast_into!(parameter, Identifier);
-                        assert_identifier_eq!(identifier, parameter.to_string());
-                    }
+                    assert_eq!(
+                        Statement::Expression(Expression::Function {
+                            parameters: test.parameters,
+                            body: BlockStatement { statements: vec![] },
+                        }),
+                        *statement
+                    );
                 }
             }
         }
@@ -1191,6 +1063,23 @@ mod tests {
     #[test]
     fn call_expression() {
         let input = "add(1, 2 * 3, 4 + 5);";
+
+        let expected = Statement::Expression(Expression::Call {
+            function: Box::new(Expression::Identifier(Identifier("add".to_string()))),
+            arguments: vec![
+                Expression::Literal(Literal::Integer(1)),
+                Expression::Infix {
+                    left: Box::new(Expression::Literal(Literal::Integer(2))),
+                    operator: Infix::Multiply,
+                    right: Box::new(Expression::Literal(Literal::Integer(3))),
+                },
+                Expression::Infix {
+                    left: Box::new(Expression::Literal(Literal::Integer(4))),
+                    operator: Infix::Plus,
+                    right: Box::new(Expression::Literal(Literal::Integer(5))),
+                },
+            ],
+        });
 
         let lexer = Lexer::new(input.into());
         let mut parser = Parser::new(lexer);
@@ -1204,38 +1093,8 @@ mod tests {
             }
             Ok(program) => {
                 assert_eq!(program.statements.len(), 1);
-
                 let statement = program.statements.first().unwrap();
-                let expression = cast_into!(statement, ExpressionStatement);
-                let call_expression =
-                    cast_into!(expression.expression.as_ref().unwrap(), CallExpression);
-                let identifier = cast_into!(call_expression.function, Identifier);
-                assert_identifier_eq!(identifier, "add".to_string());
-                assert_eq!(call_expression.arguments.len(), 3);
-
-                let first_argument = call_expression.arguments.first().unwrap();
-                let first_argument_literal = cast_into!(first_argument, IntegerLiteral);
-                assert_integer_literal_eq!(first_argument_literal, 1);
-
-                let second_argument = call_expression.arguments.get(1).unwrap();
-                let second_argument_infix = cast_into!(second_argument, InfixExpression);
-                let second_argument_infix_left =
-                    cast_into!(second_argument_infix.left, IntegerLiteral);
-                let second_argument_infix_right =
-                    cast_into!(second_argument_infix.right, IntegerLiteral);
-                assert_eq!(second_argument_infix.token.formatted(), "*".to_string());
-                assert_integer_literal_eq!(second_argument_infix_left, 2);
-                assert_integer_literal_eq!(second_argument_infix_right, 3);
-
-                let third_argument = call_expression.arguments.last().unwrap();
-                let third_argument_infix = cast_into!(third_argument, InfixExpression);
-                let third_argument_infix_left =
-                    cast_into!(third_argument_infix.left, IntegerLiteral);
-                let third_argument_infix_right =
-                    cast_into!(third_argument_infix.right, IntegerLiteral);
-                assert_eq!(third_argument_infix.token.formatted(), "+".to_string());
-                assert_integer_literal_eq!(third_argument_infix_left, 4);
-                assert_integer_literal_eq!(third_argument_infix_right, 5);
+                assert_eq!(statement, &expected);
             }
         }
     }
