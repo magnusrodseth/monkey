@@ -843,7 +843,7 @@ mod tests {
         }
     }
 
-    macro_rules! assert_if_expression {
+    macro_rules! assert_if_else_eq {
         ($expression:expr, $condition:expr, $consequence:expr, $alternative:expr, $has_alternative:expr) => {
             let if_expression = cast_into!($expression, IfExpression);
             let condition = cast_into!(if_expression.condition, InfixExpression);
@@ -905,7 +905,7 @@ mod tests {
                 let expression = cast_into!(statement, ExpressionStatement);
 
                 if let Some(if_expression) = &expression.expression {
-                    assert_if_expression!(
+                    assert_if_else_eq!(
                         if_expression,
                         "(x < y)".to_string(),
                         "x".to_string(),
@@ -940,7 +940,7 @@ mod tests {
                 let expression = cast_into!(statement, ExpressionStatement);
 
                 if let Some(if_expression) = &expression.expression {
-                    assert_if_expression!(
+                    assert_if_else_eq!(
                         if_expression,
                         "(x < y)".to_string(),
                         "x".to_string(),
