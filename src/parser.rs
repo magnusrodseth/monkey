@@ -847,27 +847,38 @@ mod tests {
         ($expression:expr, $condition:expr, $consequence:expr, $alternative:expr, $has_alternative:expr) => {
             let if_expression = cast_into!($expression, IfExpression);
             let condition = cast_into!(if_expression.condition, InfixExpression);
-            let left = cast_into!(condition.left, Identifier);
-            assert_identifier_eq!(left, $condition);
+            assert_eq!(condition.to_string(), $condition);
 
             let consequence = cast_into!(if_expression.consequence, BlockStatement);
             assert_eq!(consequence.statements.len(), 1);
 
             let consequence_expression =
                 cast_into!(consequence.statements.first().unwrap(), ExpressionStatement);
-            let consequence_identifier =
-                cast_into!(consequence_expression.expression.unwrap(), Identifier);
+            let consequence_identifier = cast_into!(
+                consequence_expression.expression.as_ref().unwrap(),
+                Identifier
+            );
             assert_identifier_eq!(consequence_identifier, $consequence);
 
             if $has_alternative {
                 assert!(if_expression.alternative.is_some());
-                let alternative = cast_into!(if_expression.alternative.unwrap(), BlockStatement);
+
+                let alternative =
+                    cast_into!(if_expression.alternative.as_ref().unwrap(), BlockStatement);
+
                 assert_eq!(alternative.statements.len(), 1);
-                let alternative_expression =
-                    cast_into!(alternative.statements.first().unwrap(), ExpressionStatement);
-                let alternative_identifier =
-                    cast_into!(alternative_expression.expression.unwrap(), Identifier);
-                assert_eq!(alternative_identifier.value, $alternative);
+                let alternative_statement = alternative.statements.first();
+                if let Some(alternative_statement) = alternative_statement {
+                    let alternative = cast_into!(alternative_statement, ExpressionStatement);
+                    if let Some(expression) = &alternative.expression {
+                        let alternative_identifier = cast_into!(expression, Identifier);
+                        assert_identifier_eq!(alternative_identifier, "y".to_string());
+                    } else {
+                        panic!("Expected statement, got something else");
+                    }
+                } else {
+                    panic!("Expected statement, got something else");
+                }
             } else {
                 assert!(if_expression.alternative.is_none());
             }
@@ -890,40 +901,19 @@ mod tests {
             }
             Ok(program) => {
                 assert_eq!(program.statements.len(), 1);
+                let statement = program.statements.first().unwrap();
+                let expression = cast_into!(statement, ExpressionStatement);
 
-                if let Some(statement) = program.statements.first() {
-                    // assert_if_expression!(statement, "x".into(), "x".into(), "".into(), false);
-
-                    let expression = cast_into!(statement, ExpressionStatement);
-                    if let Some(expression) = &expression.expression {
-                        let if_expression = cast_into!(expression, IfExpression);
-                        let condition = cast_into!(if_expression.condition, InfixExpression);
-                        let left = cast_into!(condition.left, Identifier);
-                        assert_eq!(left.value, "x");
-                        assert_eq!(condition.token.formatted(), "<");
-                        let right = cast_into!(condition.right, Identifier);
-                        assert_eq!(right.value, "y");
-
-                        let consequence = cast_into!(if_expression.consequence, BlockStatement);
-                        assert_eq!(consequence.statements.len(), 1);
-                        let consequence_statement = consequence.statements.first();
-                        if let Some(consequence_statement) = consequence_statement {
-                            let consequence =
-                                cast_into!(consequence_statement, ExpressionStatement);
-                            if let Some(expression) = &consequence.expression {
-                                let consequence_identifier = cast_into!(expression, Identifier);
-                                assert_identifier_eq!(consequence_identifier, "x".to_string());
-                            } else {
-                                panic!("Expected statement, got something else");
-                            }
-                        } else {
-                            panic!("Expected statement, got something else");
-                        }
-
-                        assert!(if_expression.alternative.is_none());
-                    }
+                if let Some(if_expression) = &expression.expression {
+                    assert_if_expression!(
+                        if_expression,
+                        "(x < y)".to_string(),
+                        "x".to_string(),
+                        "".to_string(),
+                        false
+                    );
                 } else {
-                    panic!("Expected statement, got something else");
+                    panic!("Expected expression, got something else");
                 }
             }
         }
@@ -946,57 +936,19 @@ mod tests {
             Ok(program) => {
                 assert_eq!(program.statements.len(), 1);
 
-                if let Some(statement) = program.statements.first() {
-                    // assert_if_expression!(statement, "x".into(), "x".into(), "".into(), false);
+                let statement = program.statements.first().unwrap();
+                let expression = cast_into!(statement, ExpressionStatement);
 
-                    let expression = cast_into!(statement, ExpressionStatement);
-                    if let Some(expression) = &expression.expression {
-                        let if_expression = cast_into!(expression, IfExpression);
-                        let condition = cast_into!(if_expression.condition, InfixExpression);
-                        let left = cast_into!(condition.left, Identifier);
-                        assert_eq!(left.value, "x");
-                        assert_eq!(condition.token.formatted(), "<");
-                        let right = cast_into!(condition.right, Identifier);
-                        assert_eq!(right.value, "y");
-
-                        let consequence = cast_into!(if_expression.consequence, BlockStatement);
-                        assert_eq!(consequence.statements.len(), 1);
-                        let consequence_statement = consequence.statements.first();
-                        if let Some(consequence_statement) = consequence_statement {
-                            let consequence =
-                                cast_into!(consequence_statement, ExpressionStatement);
-                            if let Some(expression) = &consequence.expression {
-                                let consequence_identifier = cast_into!(expression, Identifier);
-                                assert_identifier_eq!(consequence_identifier, "x".to_string());
-                            } else {
-                                panic!("Expected statement, got something else");
-                            }
-                        } else {
-                            panic!("Expected statement, got something else");
-                        }
-
-                        assert!(if_expression.alternative.is_some());
-
-                        let alternative =
-                            cast_into!(if_expression.alternative.as_ref().unwrap(), BlockStatement);
-
-                        assert_eq!(alternative.statements.len(), 1);
-                        let alternative_statement = alternative.statements.first();
-                        if let Some(alternative_statement) = alternative_statement {
-                            let alternative =
-                                cast_into!(alternative_statement, ExpressionStatement);
-                            if let Some(expression) = &alternative.expression {
-                                let alternative_identifier = cast_into!(expression, Identifier);
-                                assert_identifier_eq!(alternative_identifier, "y".to_string());
-                            } else {
-                                panic!("Expected statement, got something else");
-                            }
-                        } else {
-                            panic!("Expected statement, got something else");
-                        }
-                    } else {
-                        panic!("Expected statement, got something else");
-                    }
+                if let Some(if_expression) = &expression.expression {
+                    assert_if_expression!(
+                        if_expression,
+                        "(x < y)".to_string(),
+                        "x".to_string(),
+                        "y".to_string(),
+                        true
+                    );
+                } else {
+                    panic!("Expected expression, got something else");
                 }
             }
         }

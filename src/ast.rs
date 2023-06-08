@@ -31,7 +31,14 @@ impl Program {
         let mut output = String::new();
 
         for statement in self.statements.iter() {
-            output.push_str(&statement.to_string());
+            // If statement is block statement, add curly braces
+            if statement.token() == Token::LeftBrace {
+                output.push_str("{");
+                output.push_str(&statement.to_string());
+                output.push_str("}");
+            } else {
+                output.push_str(&statement.to_string());
+            }
         }
 
         output
