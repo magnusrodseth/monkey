@@ -248,6 +248,29 @@ impl Node for InfixExpression {
     }
 }
 
+pub struct Boolean {
+    pub token: Token,
+    pub value: bool,
+}
+
+impl Expression for Boolean {
+    fn expression_node(&self) {}
+}
+
+impl Node for Boolean {
+    fn token(&self) -> Token {
+        self.token.clone()
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn to_string(&self) -> String {
+        self.value.to_string()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

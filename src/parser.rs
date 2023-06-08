@@ -2,8 +2,8 @@ use std::{collections::HashMap, error::Error, fmt::Display};
 
 use crate::{
     ast::{
-        Expression, ExpressionStatement, Identifier, InfixExpression, IntegerLiteral, LetStatement,
-        PrefixExpression, Program, ReturnStatement, Statement,
+        Boolean, Expression, ExpressionStatement, Identifier, InfixExpression, IntegerLiteral,
+        LetStatement, PrefixExpression, Program, ReturnStatement, Statement,
     },
     lexer::Lexer,
     token::Token,
@@ -238,6 +238,7 @@ impl Parser {
             Token::Integer(_) => self.parse_integer_literal(),
             Token::Identifier(_) => self.parse_identifier(),
             Token::Bang | Token::Minus | Token::Plus => self.parse_prefix(),
+            Token::True | Token::False => self.parse_boolean(),
             _ => {
                 self.errors.push(ParserError::new(
                     format!("No prefix parse function for {}", self.current_token).into(),
@@ -248,23 +249,8 @@ impl Parser {
 
         // Parse infix
         while !self.peek_token_is(&Token::Semicolon) && precedence < self.peek_precedence() {
-            // match self.precedences.get(&self.peek_token) {
-            //     Some(_) => {
-            //         self.next_token();
-            //         left = self.parse_infix(left.expect("Expected left expression"));
-            //     }
-            //     _ => return left,
-            // }
-
-            match self.peek_token {
-                Token::Plus
-                | Token::Minus
-                | Token::Asterisk
-                | Token::Slash
-                | Token::Equal
-                | Token::NotEqual
-                | Token::LessThan
-                | Token::GreaterThan => {
+            match self.precedences.get(&self.peek_token) {
+                Some(_) => {
                     self.next_token();
                     left = self.parse_infix(left.expect("Expected left expression"));
                 }
@@ -328,6 +314,13 @@ impl Parser {
         precedences.insert(Token::Asterisk, Precedence::Product);
 
         precedences
+    }
+
+    fn parse_boolean(&self) -> Option<Box<dyn Expression>> {
+        Some(Box::new(Boolean {
+            token: self.current_token.clone(),
+            value: self.current_token_is(Token::True),
+        }))
     }
 }
 
@@ -642,8 +635,7 @@ mod tests {
 
                             assert_eq!(infix.token.formatted(), test.operator);
 
-                            assert_eq!(right.value, test.right_value);
-                            assert_eq!(right.token, Token::Integer(test.right_value));
+                            assert_integer_literal_eq!(left, test.left_value);
                         }
                     } else {
                         panic!("Expected statement, got something else");
@@ -708,6 +700,22 @@ mod tests {
             OperatorPrecedenceTest {
                 input: "3 + 4 * 5 == 3 * 1 + 4 * 5",
                 expected: "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))",
+            },
+            OperatorPrecedenceTest {
+                input: "true",
+                expected: "true",
+            },
+            OperatorPrecedenceTest {
+                input: "false",
+                expected: "false",
+            },
+            OperatorPrecedenceTest {
+                input: "3 > 5 == false",
+                expected: "((3 > 5) == false)",
+            },
+            OperatorPrecedenceTest {
+                input: "3 < 5 == true",
+                expected: "((3 < 5) == true)",
             },
         ];
 
