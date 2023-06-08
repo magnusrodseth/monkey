@@ -239,6 +239,7 @@ impl Parser {
             Token::Identifier(_) => self.parse_identifier(),
             Token::Bang | Token::Minus | Token::Plus => self.parse_prefix(),
             Token::True | Token::False => self.parse_boolean(),
+            Token::LeftParenthesis => self.parse_grouped_expression(),
             _ => {
                 self.errors.push(ParserError::new(
                     format!("No prefix parse function for {}", self.current_token).into(),
@@ -321,6 +322,18 @@ impl Parser {
             token: self.current_token.clone(),
             value: self.current_token_is(Token::True),
         }))
+    }
+
+    fn parse_grouped_expression(&mut self) -> Option<Box<dyn Expression>> {
+        self.next_token();
+
+        let expression = self.parse_expression(Precedence::Lowest);
+
+        if !self.peek_and_expect(Token::RightParenthesis) {
+            return None;
+        }
+
+        expression
     }
 }
 
@@ -716,6 +729,26 @@ mod tests {
             OperatorPrecedenceTest {
                 input: "3 < 5 == true",
                 expected: "((3 < 5) == true)",
+            },
+            OperatorPrecedenceTest {
+                input: "1 + (2 + 3) + 4",
+                expected: "((1 + (2 + 3)) + 4)",
+            },
+            OperatorPrecedenceTest {
+                input: "(5 + 5) * 2",
+                expected: "((5 + 5) * 2)",
+            },
+            OperatorPrecedenceTest {
+                input: "2 / (5 + 5)",
+                expected: "(2 / (5 + 5))",
+            },
+            OperatorPrecedenceTest {
+                input: "-(5 + 5)",
+                expected: "(-(5 + 5))",
+            },
+            OperatorPrecedenceTest {
+                input: "!(true == true)",
+                expected: "(!(true == true))",
             },
         ];
 
