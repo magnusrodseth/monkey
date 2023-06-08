@@ -103,9 +103,7 @@ impl Parser {
     }
 
     fn parse(&mut self) -> Result<Program, ParserError> {
-        let mut program = Program {
-            statements: Vec::new(),
-        };
+        let mut program = Program::new();
 
         while !self.current_token_is(Token::EOF) {
             match self.parse_statement() {
@@ -235,11 +233,6 @@ impl Parser {
     }
 
     fn parse_expression(&mut self, precedence: Precedence) -> Option<Box<dyn Expression>> {
-        dbg!(self.current_token.clone());
-        dbg!(self.peek_token.clone());
-        dbg!(precedence.clone());
-        println!();
-
         // Parse prefix
         let mut left = match self.current_token {
             Token::Integer(_) => self.parse_integer_literal(),
@@ -255,8 +248,23 @@ impl Parser {
 
         // Parse infix
         while !self.peek_token_is(&Token::Semicolon) && precedence < self.peek_precedence() {
-            match self.precedences.get(&self.peek_token) {
-                Some(_) => {
+            // match self.precedences.get(&self.peek_token) {
+            //     Some(_) => {
+            //         self.next_token();
+            //         left = self.parse_infix(left.expect("Expected left expression"));
+            //     }
+            //     _ => return left,
+            // }
+
+            match self.peek_token {
+                Token::Plus
+                | Token::Minus
+                | Token::Asterisk
+                | Token::Slash
+                | Token::Equal
+                | Token::NotEqual
+                | Token::LessThan
+                | Token::GreaterThan => {
                     self.next_token();
                     left = self.parse_infix(left.expect("Expected left expression"));
                 }

@@ -21,6 +21,12 @@ pub struct Program {
 }
 
 impl Program {
+    pub fn new() -> Self {
+        Program {
+            statements: Vec::new(),
+        }
+    }
+
     pub fn to_string(&self) -> String {
         let mut output = String::new();
 
