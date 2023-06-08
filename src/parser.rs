@@ -167,16 +167,18 @@ impl Parser {
             ));
         }
 
-        // TODO: Skip expressions until we find a semicolon
-        while !self.current_token_is(Token::Semicolon) {
+        self.next_token();
+
+        let value = self.parse_expression(Precedence::Lowest);
+
+        if self.peek_token_is(&Token::Semicolon) {
             self.next_token();
         }
 
         Ok(Box::new(LetStatement {
             token,
             name: identifier,
-            // TODO: Parse expressions
-            value: None,
+            value,
         }))
     }
 
@@ -202,15 +204,15 @@ impl Parser {
 
         self.next_token();
 
-        // TODO: Skip expressions until we find a semicolon
-        while !self.current_token_is(Token::Semicolon) {
+        let return_value = self.parse_expression(Precedence::Lowest);
+
+        if self.peek_token_is(&Token::Semicolon) {
             self.next_token();
         }
 
         Ok(Box::new(ReturnStatement {
             token,
-            // TODO: Pars expresion
-            return_value: None,
+            return_value,
         }))
     }
 
