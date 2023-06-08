@@ -2,9 +2,9 @@ use std::{collections::HashMap, error::Error, fmt::Display};
 
 use crate::{
     ast::{
-        BlockStatement, Boolean, Expression, ExpressionStatement, FunctionLiteral, Identifier,
-        IfExpression, InfixExpression, IntegerLiteral, LetStatement, PrefixExpression, Program,
-        ReturnStatement, Statement,
+        BlockStatement, Boolean, CallExpression, Expression, ExpressionStatement, FunctionLiteral,
+        Identifier, IfExpression, InfixExpression, IntegerLiteral, LetStatement, PrefixExpression,
+        Program, ReturnStatement, Statement,
     },
     lexer::Lexer,
     token::Token,
@@ -263,10 +263,16 @@ impl Parser {
         // Parse infix
         while !self.peek_token_is(&Token::Semicolon) && precedence < self.peek_precedence() {
             match self.precedences.get(&self.peek_token) {
-                Some(_) => {
-                    self.next_token();
-                    left = self.parse_infix(left.expect("Expected left expression"));
-                }
+                Some(precedence) => match precedence {
+                    Precedence::Call => {
+                        self.next_token();
+                        left = self.parse_call_expression(left.expect("Expected left expression"));
+                    }
+                    _ => {
+                        self.next_token();
+                        left = self.parse_infix(left.expect("Expected left expression"));
+                    }
+                },
                 _ => return left,
             }
         }
@@ -325,6 +331,8 @@ impl Parser {
 
         precedences.insert(Token::Slash, Precedence::Product);
         precedences.insert(Token::Asterisk, Precedence::Product);
+
+        precedences.insert(Token::LeftParenthesis, Precedence::Call);
 
         precedences
     }
@@ -475,14 +483,60 @@ impl Parser {
 
         identifiers
     }
+
+    fn parse_call_expression(
+        &mut self,
+        function: Box<dyn Expression>,
+    ) -> Option<Box<dyn Expression>> {
+        let token = self.current_token.clone();
+        let arguments = self.parse_call_arguments();
+
+        Some(Box::new(CallExpression {
+            token,
+            function,
+            arguments,
+        }))
+    }
+
+    fn parse_call_arguments(&mut self) -> Vec<Box<dyn Expression>> {
+        let mut arguments = Vec::new();
+
+        if self.peek_token_is(&Token::RightParenthesis) {
+            self.next_token();
+            return arguments;
+        }
+
+        self.next_token();
+
+        let expression = self
+            .parse_expression(Precedence::Lowest)
+            .expect("Expected expression");
+        arguments.push(expression);
+
+        while self.peek_token_is(&Token::Comma) {
+            self.next_token();
+            self.next_token();
+
+            let expression = self
+                .parse_expression(Precedence::Lowest)
+                .expect("Expected expression");
+            arguments.push(expression);
+        }
+
+        if !self.peek_and_expect(Token::RightParenthesis) {
+            return Vec::new();
+        }
+
+        arguments
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::ast::{
-        BlockStatement, ExpressionStatement, FunctionLiteral, IfExpression, InfixExpression,
-        IntegerLiteral, LetStatement, Node, PrefixExpression, ReturnStatement,
+        BlockStatement, CallExpression, ExpressionStatement, FunctionLiteral, IfExpression,
+        InfixExpression, IntegerLiteral, LetStatement, Node, PrefixExpression, ReturnStatement,
     };
 
     /// Casts an expression into a specific type, panicking if the cast fails.
@@ -890,6 +944,18 @@ mod tests {
                 input: "!(true == true)",
                 expected: "(!(true == true))",
             },
+            OperatorPrecedenceTest {
+                input: "a + add(b * c) + d",
+                expected: "((a + add((b * c))) + d)",
+            },
+            OperatorPrecedenceTest {
+                input: "add(a, b, 1, 2 * 3, 4 + 5, add(6, 7 * 8))",
+                expected: "add(a, b, 1, (2 * 3), (4 + 5), add(6, (7 * 8)))",
+            },
+            OperatorPrecedenceTest {
+                input: "add(a + b + c * d / f + g)",
+                expected: "add((((a + b) + ((c * d) / f)) + g))",
+            },
         ];
 
         for test in expected {
@@ -1114,6 +1180,58 @@ mod tests {
                         assert_identifier_eq!(identifier, parameter.to_string());
                     }
                 }
+            }
+        }
+    }
+
+    #[test]
+    fn call_expression() {
+        let input = "add(1, 2 * 3, 4 + 5);";
+
+        let lexer = Lexer::new(input.into());
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse();
+
+        print_parser_errors!(parser.errors());
+
+        match program {
+            Err(_) => {
+                panic!("Parser error");
+            }
+            Ok(program) => {
+                assert_eq!(program.statements.len(), 1);
+
+                let statement = program.statements.first().unwrap();
+                let expression = cast_into!(statement, ExpressionStatement);
+                let call_expression =
+                    cast_into!(expression.expression.as_ref().unwrap(), CallExpression);
+                let identifier = cast_into!(call_expression.function, Identifier);
+                assert_identifier_eq!(identifier, "add".to_string());
+                assert_eq!(call_expression.arguments.len(), 3);
+
+                let first_argument = call_expression.arguments.first().unwrap();
+                let first_argument_literal = cast_into!(first_argument, IntegerLiteral);
+                assert_integer_literal_eq!(first_argument_literal, 1);
+
+                let second_argument = call_expression.arguments.get(1).unwrap();
+                let second_argument_infix = cast_into!(second_argument, InfixExpression);
+                let second_argument_infix_left =
+                    cast_into!(second_argument_infix.left, IntegerLiteral);
+                let second_argument_infix_right =
+                    cast_into!(second_argument_infix.right, IntegerLiteral);
+                assert_eq!(second_argument_infix.token.formatted(), "*".to_string());
+                assert_integer_literal_eq!(second_argument_infix_left, 2);
+                assert_integer_literal_eq!(second_argument_infix_right, 3);
+
+                let third_argument = call_expression.arguments.last().unwrap();
+                let third_argument_infix = cast_into!(third_argument, InfixExpression);
+                let third_argument_infix_left =
+                    cast_into!(third_argument_infix.left, IntegerLiteral);
+                let third_argument_infix_right =
+                    cast_into!(third_argument_infix.right, IntegerLiteral);
+                assert_eq!(third_argument_infix.token.formatted(), "+".to_string());
+                assert_integer_literal_eq!(third_argument_infix_left, 4);
+                assert_integer_literal_eq!(third_argument_infix_right, 5);
             }
         }
     }

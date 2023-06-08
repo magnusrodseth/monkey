@@ -10,9 +10,7 @@ pub trait Node: Any {
 
 pub trait Statement: Node {}
 
-pub trait Expression: Node {
-    fn expression_node(&self);
-}
+pub trait Expression: Node {}
 
 pub struct Program {
     pub statements: Vec<Box<dyn Statement>>,
@@ -73,9 +71,7 @@ pub struct Identifier {
     pub value: String,
 }
 
-impl Expression for Identifier {
-    fn expression_node(&self) {}
-}
+impl Expression for Identifier {}
 
 impl Node for Identifier {
     fn token(&self) -> Token {
@@ -173,9 +169,7 @@ pub struct IntegerLiteral {
     pub value: i64,
 }
 
-impl Expression for IntegerLiteral {
-    fn expression_node(&self) {}
-}
+impl Expression for IntegerLiteral {}
 
 impl Node for IntegerLiteral {
     fn token(&self) -> Token {
@@ -196,9 +190,7 @@ pub struct PrefixExpression {
     pub right: Box<dyn Expression>,
 }
 
-impl Expression for PrefixExpression {
-    fn expression_node(&self) {}
-}
+impl Expression for PrefixExpression {}
 
 impl Node for PrefixExpression {
     fn token(&self) -> Token {
@@ -224,9 +216,7 @@ pub struct InfixExpression {
     pub right: Box<dyn Expression>,
 }
 
-impl Expression for InfixExpression {
-    fn expression_node(&self) {}
-}
+impl Expression for InfixExpression {}
 
 impl Node for InfixExpression {
     fn token(&self) -> Token {
@@ -252,9 +242,7 @@ pub struct Boolean {
     pub value: bool,
 }
 
-impl Expression for Boolean {
-    fn expression_node(&self) {}
-}
+impl Expression for Boolean {}
 
 impl Node for Boolean {
     fn token(&self) -> Token {
@@ -277,9 +265,7 @@ pub struct IfExpression {
     pub alternative: Option<BlockStatement>,
 }
 
-impl Expression for IfExpression {
-    fn expression_node(&self) {}
-}
+impl Expression for IfExpression {}
 
 impl Node for IfExpression {
     fn token(&self) -> Token {
@@ -338,9 +324,7 @@ pub struct FunctionLiteral {
     pub body: BlockStatement,
 }
 
-impl Expression for FunctionLiteral {
-    fn expression_node(&self) {}
-}
+impl Expression for FunctionLiteral {}
 
 impl Node for FunctionLiteral {
     fn token(&self) -> Token {
@@ -363,6 +347,40 @@ impl Node for FunctionLiteral {
         }
 
         output.push_str(&format!(") {}", self.body.to_string()));
+
+        output
+    }
+}
+
+pub struct CallExpression {
+    pub token: Token,
+    pub function: Box<dyn Expression>,
+    pub arguments: Vec<Box<dyn Expression>>,
+}
+
+impl Expression for CallExpression {}
+
+impl Node for CallExpression {
+    fn token(&self) -> Token {
+        self.token.clone()
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn to_string(&self) -> String {
+        let mut output = format!("{}(", self.function.to_string());
+
+        for (i, argument) in self.arguments.iter().enumerate() {
+            output.push_str(&argument.to_string());
+
+            if i != self.arguments.len() - 1 {
+                output.push_str(", ");
+            }
+        }
+
+        output.push_str(")");
 
         output
     }
