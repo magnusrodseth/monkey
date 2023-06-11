@@ -23,6 +23,7 @@ impl Evaluator {
             }
 
             match self.evaluate_statement(statement) {
+                Some(Object::Return(object)) => return Some(*object),
                 object => result = object,
             }
         }
@@ -33,6 +34,7 @@ impl Evaluator {
     fn evaluate_statement(&mut self, statement: Statement) -> Option<Object> {
         match statement {
             Statement::Expression(expression) => self.evaluate_expression(expression),
+            Statement::Return(expression) => self.evaluate_return_statement(expression),
             _ => None,
         }
     }
@@ -42,6 +44,7 @@ impl Evaluator {
 
         for statement in block.statements {
             match self.evaluate_statement(statement) {
+                Some(Object::Return(object)) => return Some(Object::Return(object)),
                 object => result = object,
             }
         }
@@ -185,6 +188,23 @@ impl Evaluator {
                 Some(alternative) => self.evaluate_block_statement(alternative),
                 None => None,
             }
+        }
+    }
+
+    fn evaluate_return_statement(&mut self, expression: Expression) -> Option<Object> {
+        let value = self.evaluate_expression(expression)?;
+
+        if self.is_error(&value) {
+            return Some(value);
+        }
+
+        Some(Object::Return(Box::new(value)))
+    }
+
+    fn is_error(&self, value: &Object) -> bool {
+        match value {
+            Object::Error(_) => true,
+            _ => false,
         }
     }
 }
@@ -488,6 +508,52 @@ mod tests {
         for test in tests {
             let evaluated = evaluate(test.input);
             assert_eq!(evaluated, test.expected);
+        }
+    }
+
+    #[test]
+    fn evaluate_return() {
+        struct Test {
+            input: String,
+            expected: i64,
+        }
+
+        let tests = vec![
+            Test {
+                input: String::from("return 10;"),
+                expected: 10,
+            },
+            Test {
+                input: String::from("return 10; 9;"),
+                expected: 10,
+            },
+            Test {
+                input: String::from("return 2 * 5; 9;"),
+                expected: 10,
+            },
+            Test {
+                input: String::from("9; return 2 * 5; 9;"),
+                expected: 10,
+            },
+            Test {
+                input: String::from(
+                    r#"
+                    if (10 > 1) {
+                        if (10 > 1) {
+                            return 10;
+                        }
+
+                        return 1;
+                    }
+                    "#,
+                ),
+                expected: 10,
+            },
+        ];
+
+        for test in tests {
+            let evaluated = evaluate(test.input);
+            assert_eq!(evaluated, Some(Object::Integer(test.expected)));
         }
     }
 }
