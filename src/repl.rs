@@ -1,4 +1,4 @@
-use std::io::Write;
+use std::{cell::RefCell, env, io::Write, rc::Rc};
 
 use crate::{
     environment::Environment,
@@ -39,7 +39,8 @@ impl Repl {
 
     pub fn start() {
         // Parsist the environment
-        let environment = Environment::new();
+        let environment = Rc::new(RefCell::new(Environment::new()));
+        let mut evaluator = Evaluator::new(environment);
 
         loop {
             print!("{}", PROMPT);
@@ -64,13 +65,10 @@ impl Repl {
                     Repl::print_errors(parser.errors());
                 }
                 Ok(program) => {
-                    let evaluated = Evaluator::new(Environment::new()).evaluate(program);
-                    match evaluated {
-                        Some(object) => {
-                            println!("{}", object);
-                            println!();
-                        }
-                        None => {}
+                    let evaluated = evaluator.evaluate(program);
+
+                    if let Some(evaluated) = evaluated {
+                        println!("{}\n", evaluated);
                     }
                 }
             }

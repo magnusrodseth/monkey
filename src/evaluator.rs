@@ -1,3 +1,5 @@
+use std::{cell::RefCell, rc::Rc};
+
 use crate::{
     ast::{BlockStatement, Expression, Identifier, Infix, Literal, Prefix, Program, Statement},
     environment::Environment,
@@ -9,11 +11,11 @@ const TRUE: Object = Object::Boolean(true);
 const FALSE: Object = Object::Boolean(false);
 
 pub struct Evaluator {
-    environment: Environment,
+    environment: Rc<RefCell<Environment>>,
 }
 
 impl Evaluator {
-    pub fn new(environment: Environment) -> Self {
+    pub fn new(environment: Rc<RefCell<Environment>>) -> Self {
         Self { environment }
     }
 
@@ -242,13 +244,13 @@ impl Evaluator {
         }
 
         let Identifier(identifier) = identifier;
-        self.environment.set(identifier, value.clone());
+        self.environment.borrow_mut().set(identifier, value.clone());
         None
     }
 
     fn evaluate_identifier(&self, identifier: Identifier) -> Object {
         let Identifier(identifier) = identifier;
-        match self.environment.get(&identifier) {
+        match self.environment.borrow_mut().get(&identifier) {
             Some(value) => value.clone(),
             None => Object::Error(format!("identifier not found: {}", identifier)),
         }
@@ -291,7 +293,7 @@ mod tests {
         let lexer = Lexer::new(input);
         let mut parser = Parser::new(lexer);
         let program = parser.parse();
-        let mut evaluator = Evaluator::new(Environment::new());
+        let mut evaluator = Evaluator::new(Rc::new(RefCell::new(Environment::new())));
 
         print_parser_errors!(parser.errors());
 
