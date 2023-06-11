@@ -82,6 +82,9 @@ impl Evaluator {
                 alternative,
             } => self.evaluate_if_expression(condition, consequence, alternative),
             Expression::Identifier(identifier) => Some(self.evaluate_identifier(identifier)),
+            Expression::Function { parameters, body } => {
+                Some(self.evaluate_function(parameters, body))
+            }
             _ => None,
         }
     }
@@ -253,6 +256,14 @@ impl Evaluator {
         match self.environment.borrow_mut().get(&identifier) {
             Some(value) => value.clone(),
             None => Object::Error(format!("identifier not found: {}", identifier)),
+        }
+    }
+
+    fn evaluate_function(&self, parameters: Vec<Identifier>, body: BlockStatement) -> Object {
+        Object::Function {
+            parameters,
+            body,
+            environment: Rc::clone(&self.environment),
         }
     }
 }
@@ -693,6 +704,25 @@ mod tests {
         for test in tests {
             let evaluated = evaluate(test.input);
             assert_integer_object!(evaluated, test.expected);
+        }
+    }
+
+    #[test]
+    fn evaluate_function() {
+        let input = String::from("fn(x) { x + 2; };");
+        let evaluated = evaluate(input);
+
+        match evaluated {
+            Some(Object::Function {
+                parameters,
+                body,
+                environment: _,
+            }) => {
+                assert_eq!(parameters.len(), 1);
+                assert_eq!(parameters[0].to_string(), "x");
+                assert_eq!(body.to_string(), "(x + 2)");
+            }
+            _ => panic!("object is not Function. got={:?}", evaluated),
         }
     }
 }

@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use crate::object::Object;
 
+#[derive(Debug, Eq, PartialEq)]
 pub struct Environment {
     values: HashMap<String, Object>,
 }

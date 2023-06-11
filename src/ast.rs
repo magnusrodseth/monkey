@@ -3,6 +3,12 @@ use std::fmt::Display;
 #[derive(Debug, PartialEq, Eq, PartialOrd, Clone)]
 pub struct Identifier(pub String);
 
+impl Display for Identifier {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", &self.0)
+    }
+}
+
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum Prefix {
     Plus,
