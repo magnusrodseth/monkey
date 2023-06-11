@@ -1,6 +1,7 @@
 use repl::Repl;
 
 mod ast;
+mod environment;
 mod evaluator;
 mod lexer;
 mod object;

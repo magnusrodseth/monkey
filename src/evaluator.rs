@@ -1,5 +1,6 @@
 use crate::{
-    ast::{BlockStatement, Expression, Infix, Literal, Prefix, Program, Statement},
+    ast::{BlockStatement, Expression, Identifier, Infix, Literal, Prefix, Program, Statement},
+    environment::Environment,
     object::Object,
 };
 
@@ -7,11 +8,13 @@ const NULL: Object = Object::Null;
 const TRUE: Object = Object::Boolean(true);
 const FALSE: Object = Object::Boolean(false);
 
-pub struct Evaluator {}
+pub struct Evaluator {
+    environment: Environment,
+}
 
 impl Evaluator {
-    pub fn new() -> Self {
-        Self {}
+    pub fn new(environment: Environment) -> Self {
+        Self { environment }
     }
 
     pub fn evaluate(&mut self, program: Program) -> Option<Object> {
@@ -36,6 +39,7 @@ impl Evaluator {
         match statement {
             Statement::Expression(expression) => self.evaluate_expression(expression),
             Statement::Return(expression) => self.evaluate_return_statement(expression),
+            Statement::Let { identifier, value } => self.evaluate_let_statement(identifier, value),
             _ => None,
         }
     }
@@ -75,6 +79,7 @@ impl Evaluator {
                 consequence,
                 alternative,
             } => self.evaluate_if_expression(condition, consequence, alternative),
+            Expression::Identifier(identifier) => Some(self.evaluate_identifier(identifier)),
             _ => None,
         }
     }
@@ -224,11 +229,35 @@ impl Evaluator {
             _ => false,
         }
     }
+
+    fn evaluate_let_statement(
+        &mut self,
+        identifier: Identifier,
+        expression: Expression,
+    ) -> Option<Object> {
+        let value = self.evaluate_expression(expression)?;
+
+        if self.is_error(&value) {
+            return Some(value);
+        }
+
+        let Identifier(identifier) = identifier;
+        self.environment.set(identifier, value.clone());
+        None
+    }
+
+    fn evaluate_identifier(&self, identifier: Identifier) -> Object {
+        let Identifier(identifier) = identifier;
+        match self.environment.get(&identifier) {
+            Some(value) => value.clone(),
+            None => Object::Error(format!("identifier not found: {}", identifier)),
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::{lexer::Lexer, parser::Parser};
+    use crate::{environment::Environment, lexer::Lexer, parser::Parser};
 
     use super::*;
 
@@ -262,7 +291,8 @@ mod tests {
         let lexer = Lexer::new(input);
         let mut parser = Parser::new(lexer);
         let program = parser.parse();
-        let mut evaluator = Evaluator::new();
+        let mut evaluator = Evaluator::new(Environment::new());
+
         print_parser_errors!(parser.errors());
 
         return match program {
@@ -620,11 +650,47 @@ mod tests {
                 ),
                 expected: String::from("unknown operator: true + false"),
             },
+            Test {
+                input: String::from("foobar"),
+                expected: String::from("identifier not found: foobar"),
+            },
         ];
 
         for test in tests {
             let evaluated = evaluate(test.input);
             assert_eq!(evaluated, Some(Object::Error(test.expected)));
+        }
+    }
+
+    #[test]
+    fn evaluate_let_statement() {
+        struct Test {
+            input: String,
+            expected: i64,
+        }
+
+        let tests = vec![
+            Test {
+                input: String::from("let a = 5; a;"),
+                expected: 5,
+            },
+            Test {
+                input: String::from("let a = 5 * 5; a;"),
+                expected: 25,
+            },
+            Test {
+                input: String::from("let a = 5; let b = a; b;"),
+                expected: 5,
+            },
+            Test {
+                input: String::from("let a = 5; let b = a; let c = a + b + 5; c;"),
+                expected: 15,
+            },
+        ];
+
+        for test in tests {
+            let evaluated = evaluate(test.input);
+            assert_integer_object!(evaluated, test.expected);
         }
     }
 }

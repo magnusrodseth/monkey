@@ -1,6 +1,7 @@
 use std::io::Write;
 
 use crate::{
+    environment::Environment,
     evaluator::Evaluator,
     lexer::Lexer,
     parser::{Parser, ParserError},
@@ -37,6 +38,9 @@ impl Repl {
     }
 
     pub fn start() {
+        // Parsist the environment
+        let environment = Environment::new();
+
         loop {
             print!("{}", PROMPT);
             std::io::stdout().flush().unwrap();
@@ -60,9 +64,12 @@ impl Repl {
                     Repl::print_errors(parser.errors());
                 }
                 Ok(program) => {
-                    let evaluated = Evaluator::new().evaluate(program);
+                    let evaluated = Evaluator::new(Environment::new()).evaluate(program);
                     match evaluated {
-                        Some(object) => println!("{}", object),
+                        Some(object) => {
+                            println!("{}", object);
+                            println!();
+                        }
                         None => {}
                     }
                 }
