@@ -1,5 +1,5 @@
 use crate::{
-    ast::{Expression, Literal, Prefix, Program, Statement},
+    ast::{Expression, Infix, Literal, Prefix, Program, Statement},
     object::Object,
 };
 
@@ -43,6 +43,15 @@ impl Evaluator {
             Expression::Prefix { operator, right } => {
                 let right = self.evaluate_expression(*right)?;
                 Some(self.evaluate_prefix_expression(operator, right))
+            }
+            Expression::Infix {
+                left,
+                operator,
+                right,
+            } => {
+                let left = self.evaluate_expression(*left)?;
+                let right = self.evaluate_expression(*right)?;
+                Some(self.evaluate_infix_expression(operator, left, right))
             }
             _ => None,
         }
@@ -96,6 +105,50 @@ impl Evaluator {
     fn evaluate_minus_operator_expression(&self, right: Object) -> Object {
         match right {
             Object::Integer(value) => Object::Integer(-value),
+            _ => NULL,
+        }
+    }
+
+    fn evaluate_infix_expression(&self, operator: Infix, left: Object, right: Object) -> Object {
+        match (left, right) {
+            (Object::Integer(left), Object::Integer(right)) => {
+                self.evaluate_integer_infix_expression(operator, left, right)
+            }
+            (Object::Boolean(left), Object::Boolean(right)) => {
+                self.evaluate_boolean_infix_expression(operator, left, right)
+            }
+            _ => NULL,
+        }
+    }
+
+    fn evaluate_integer_infix_expression(&self, operator: Infix, left: i64, right: i64) -> Object {
+        match operator {
+            Infix::Plus => Object::Integer(left + right),
+            Infix::Minus => Object::Integer(left - right),
+            Infix::Multiply => Object::Integer(left * right),
+            Infix::Divide => Object::Integer(left / right),
+            Infix::LessThan => self.native_boolean_to_boolean_object(left < right),
+            Infix::GreaterThan => self.native_boolean_to_boolean_object(left > right),
+            Infix::Equal => self.native_boolean_to_boolean_object(left == right),
+            Infix::NotEqual => self.native_boolean_to_boolean_object(left != right),
+            Infix::LessThanOrEqual => self.native_boolean_to_boolean_object(left <= right),
+            Infix::GreaterThanOrEqual => self.native_boolean_to_boolean_object(left >= right),
+        }
+    }
+
+    fn evaluate_boolean_infix_expression(
+        &self,
+        operator: Infix,
+        left: bool,
+        right: bool,
+    ) -> Object {
+        match operator {
+            Infix::Equal => self.native_boolean_to_boolean_object(left == right),
+            Infix::NotEqual => self.native_boolean_to_boolean_object(left != right),
+            Infix::LessThan => self.native_boolean_to_boolean_object(left < right),
+            Infix::GreaterThan => self.native_boolean_to_boolean_object(left > right),
+            Infix::LessThanOrEqual => self.native_boolean_to_boolean_object(left <= right),
+            Infix::GreaterThanOrEqual => self.native_boolean_to_boolean_object(left >= right),
             _ => NULL,
         }
     }
@@ -154,10 +207,12 @@ mod tests {
         }
 
         let tests = vec![
+            // Simple integer
             Test {
                 input: String::from("5"),
                 expected: 5,
             },
+            // Prefix operator
             Test {
                 input: String::from("-5"),
                 expected: -5,
@@ -169,6 +224,51 @@ mod tests {
             Test {
                 input: String::from("-50"),
                 expected: -50,
+            },
+            // Infix operator
+            Test {
+                input: String::from("5 + 5 + 5 + 5 - 10"),
+                expected: 10,
+            },
+            Test {
+                input: String::from("2 * 2 * 2 * 2 * 2"),
+                expected: 32,
+            },
+            Test {
+                input: String::from("-50 + 100 + -50"),
+                expected: 0,
+            },
+            Test {
+                input: String::from("5 * 2 + 10"),
+                expected: 20,
+            },
+            Test {
+                input: String::from("5 + 2 * 10"),
+                expected: 25,
+            },
+            Test {
+                input: String::from("20 + 2 * -10"),
+                expected: 0,
+            },
+            Test {
+                input: String::from("50 / 2 * 2 + 10"),
+                expected: 60,
+            },
+            Test {
+                input: String::from("2 * (5 + 10)"),
+                expected: 30,
+            },
+            Test {
+                input: String::from("3 * 3 * 3 + 10"),
+                expected: 37,
+            },
+            Test {
+                input: String::from("3 * (3 * 3) + 10"),
+                expected: 37,
+            },
+            Test {
+                input: String::from("(5 + 10 * 2 + 15 / 3) * 2 + -10"),
+                expected: 50,
             },
         ];
 
@@ -186,6 +286,7 @@ mod tests {
         }
 
         let tests = vec![
+            // Simple boolean
             Test {
                 input: String::from("true"),
                 expected: true,
@@ -193,6 +294,75 @@ mod tests {
             Test {
                 input: String::from("false"),
                 expected: false,
+            },
+            // Infix operator
+            Test {
+                input: String::from("1 < 2"),
+                expected: true,
+            },
+            Test {
+                input: String::from("1 > 2"),
+                expected: false,
+            },
+            Test {
+                input: String::from("1 < 1"),
+                expected: false,
+            },
+            Test {
+                input: String::from("1 > 1"),
+                expected: false,
+            },
+            Test {
+                input: String::from("1 == 1"),
+                expected: true,
+            },
+            Test {
+                input: String::from("1 != 1"),
+                expected: false,
+            },
+            Test {
+                input: String::from("1 == 2"),
+                expected: false,
+            },
+            Test {
+                input: String::from("1 != 2"),
+                expected: true,
+            },
+            Test {
+                input: String::from("true == true"),
+                expected: true,
+            },
+            Test {
+                input: String::from("false == false"),
+                expected: true,
+            },
+            Test {
+                input: String::from("true == false"),
+                expected: false,
+            },
+            Test {
+                input: String::from("true != false"),
+                expected: true,
+            },
+            Test {
+                input: String::from("false != true"),
+                expected: true,
+            },
+            Test {
+                input: String::from("(1 < 2) == true"),
+                expected: true,
+            },
+            Test {
+                input: String::from("(1 < 2) == false"),
+                expected: false,
+            },
+            Test {
+                input: String::from("(1 > 2) == true"),
+                expected: false,
+            },
+            Test {
+                input: String::from("(1 > 2) == false"),
+                expected: true,
             },
         ];
 
