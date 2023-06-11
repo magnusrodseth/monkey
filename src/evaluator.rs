@@ -24,6 +24,7 @@ impl Evaluator {
 
             match self.evaluate_statement(statement) {
                 Some(Object::Return(object)) => return Some(*object),
+                Some(Object::Error(error)) => return Some(Object::Error(error)),
                 object => result = object,
             }
         }
@@ -45,6 +46,7 @@ impl Evaluator {
         for statement in block.statements {
             match self.evaluate_statement(statement) {
                 Some(Object::Return(object)) => return Some(Object::Return(object)),
+                Some(Object::Error(error)) => return Some(Object::Error(error)),
                 object => result = object,
             }
         }
@@ -100,7 +102,11 @@ impl Evaluator {
         match operator {
             Prefix::Not => self.evaluate_not_operator_expression(right),
             Prefix::Minus => self.evaluate_minus_operator_expression(right),
-            _ => NULL,
+            _ => self.error(format!(
+                "unknown operator: {}{}",
+                operator,
+                right.to_string()
+            )),
         }
     }
 
@@ -115,29 +121,40 @@ impl Evaluator {
 
     fn is_truthy(&self, object: Object) -> bool {
         match object {
-            NULL => false,
-            TRUE => true,
-            FALSE => false,
+            Object::Null | Object::Boolean(false) => false,
             _ => true,
         }
+    }
+
+    fn error(&self, message: String) -> Object {
+        Object::Error(message)
     }
 
     fn evaluate_minus_operator_expression(&self, right: Object) -> Object {
         match right {
             Object::Integer(value) => Object::Integer(-value),
-            _ => NULL,
+            _ => self.error(format!("unknown operator: -{}", right.to_string())),
         }
     }
 
     fn evaluate_infix_expression(&self, operator: Infix, left: Object, right: Object) -> Object {
-        match (left, right) {
-            (Object::Integer(left), Object::Integer(right)) => {
-                self.evaluate_integer_infix_expression(operator, left, right)
+        match left {
+            Object::Integer(left_value) => {
+                if let Object::Integer(right_value) = right {
+                    self.evaluate_integer_infix_expression(operator, left_value, right_value)
+                } else {
+                    self.error(format!("type mismatch: {} {} {}", left, operator, right,))
+                }
             }
-            (Object::Boolean(left), Object::Boolean(right)) => {
-                self.evaluate_boolean_infix_expression(operator, left, right)
+
+            Object::Boolean(left_value) => {
+                if let Object::Boolean(right_value) = right {
+                    self.evaluate_boolean_infix_expression(operator, left_value, right_value)
+                } else {
+                    self.error(format!("type mismatch: {} {} {}", left, operator, right,))
+                }
             }
-            _ => NULL,
+            _ => self.error(format!("unknown operator: {} {} {}", left, operator, right,)),
         }
     }
 
@@ -169,7 +186,7 @@ impl Evaluator {
             Infix::GreaterThan => self.native_boolean_to_boolean_object(left > right),
             Infix::LessThanOrEqual => self.native_boolean_to_boolean_object(left <= right),
             Infix::GreaterThanOrEqual => self.native_boolean_to_boolean_object(left >= right),
-            _ => NULL,
+            _ => self.error(format!("unknown operator: {} {} {}", left, operator, right)),
         }
     }
 
@@ -554,6 +571,60 @@ mod tests {
         for test in tests {
             let evaluated = evaluate(test.input);
             assert_eq!(evaluated, Some(Object::Integer(test.expected)));
+        }
+    }
+
+    #[test]
+    fn error_handling() {
+        struct Test {
+            input: String,
+            expected: String,
+        }
+
+        let tests = vec![
+            Test {
+                input: String::from("5 + true;"),
+                expected: String::from("type mismatch: 5 + true"),
+            },
+            Test {
+                input: String::from("5 + true; 5;"),
+                expected: String::from("type mismatch: 5 + true"),
+            },
+            Test {
+                input: String::from("-true"),
+                expected: String::from("unknown operator: -true"),
+            },
+            Test {
+                input: String::from("true + false;"),
+                expected: String::from("unknown operator: true + false"),
+            },
+            Test {
+                input: String::from("5; true + false; 5"),
+                expected: String::from("unknown operator: true + false"),
+            },
+            Test {
+                input: String::from("if (10 > 1) { true + false; }"),
+                expected: String::from("unknown operator: true + false"),
+            },
+            Test {
+                input: String::from(
+                    r#"
+                    if (10 > 1) {
+                        if (10 > 1) {
+                            return true + false;
+                        }
+
+                        return 1;
+                    }
+                    "#,
+                ),
+                expected: String::from("unknown operator: true + false"),
+            },
+        ];
+
+        for test in tests {
+            let evaluated = evaluate(test.input);
+            assert_eq!(evaluated, Some(Object::Error(test.expected)));
         }
     }
 }

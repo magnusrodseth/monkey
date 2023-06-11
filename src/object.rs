@@ -15,7 +15,7 @@ impl Display for Object {
             Object::Integer(integer) => write!(f, "{}", integer),
             Object::Boolean(boolean) => write!(f, "{}", boolean),
             Object::Return(return_value) => write!(f, "{}", return_value),
-            Object::Error(error) => write!(f, "{}", error),
+            Object::Error(error) => write!(f, "ERROR: {}", error),
             Object::Null => write!(f, "null"),
         }
     }
