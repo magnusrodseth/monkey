@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-#[derive(PartialEq, Clone, Debug)]
+#[derive(PartialEq, Clone, Eq, Debug)]
 pub enum Object {
     Integer(i64),
     Boolean(bool),

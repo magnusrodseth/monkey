@@ -1,5 +1,5 @@
 use crate::{
-    ast::{Expression, Literal, Program, Statement},
+    ast::{Expression, Literal, Prefix, Program, Statement},
     object::Object,
 };
 
@@ -40,6 +40,10 @@ impl Evaluator {
     fn evaluate_expression(&self, expression: Expression) -> Option<Object> {
         match expression {
             Expression::Literal(literal) => Some(self.evaluate_literal(literal)),
+            Expression::Prefix { operator, right } => {
+                let right = self.evaluate_expression(*right)?;
+                Some(self.evaluate_prefix_expression(operator, right))
+            }
             _ => None,
         }
     }
@@ -60,6 +64,39 @@ impl Evaluator {
             TRUE
         } else {
             FALSE
+        }
+    }
+
+    fn evaluate_prefix_expression(&self, operator: Prefix, right: Object) -> Object {
+        match operator {
+            Prefix::Not => self.evaluate_not_operator_expression(right),
+            Prefix::Minus => self.evaluate_minus_operator_expression(right),
+            _ => NULL,
+        }
+    }
+
+    fn evaluate_not_operator_expression(&self, right: Object) -> Object {
+        match right {
+            TRUE => FALSE,
+            FALSE => TRUE,
+            NULL => TRUE,
+            _ => FALSE,
+        }
+    }
+
+    fn is_truthy(&self, object: Object) -> bool {
+        match object {
+            NULL => false,
+            TRUE => true,
+            FALSE => false,
+            _ => true,
+        }
+    }
+
+    fn evaluate_minus_operator_expression(&self, right: Object) -> Object {
+        match right {
+            Object::Integer(value) => Object::Integer(-value),
+            _ => NULL,
         }
     }
 }
@@ -116,10 +153,24 @@ mod tests {
             expected: i64,
         }
 
-        let tests = vec![Test {
-            input: String::from("5"),
-            expected: 5,
-        }];
+        let tests = vec![
+            Test {
+                input: String::from("5"),
+                expected: 5,
+            },
+            Test {
+                input: String::from("-5"),
+                expected: -5,
+            },
+            Test {
+                input: String::from("-10"),
+                expected: -10,
+            },
+            Test {
+                input: String::from("-50"),
+                expected: -50,
+            },
+        ];
 
         for test in tests {
             let evaluated = evaluate(test.input);
@@ -142,6 +193,46 @@ mod tests {
             Test {
                 input: String::from("false"),
                 expected: false,
+            },
+        ];
+
+        for test in tests {
+            let evaluated = evaluate(test.input);
+            assert_boolean_object!(evaluated, test.expected);
+        }
+    }
+
+    #[test]
+    fn evaluate_not_operator() {
+        struct Test {
+            input: String,
+            expected: bool,
+        }
+
+        let tests = vec![
+            Test {
+                input: String::from("!true"),
+                expected: false,
+            },
+            Test {
+                input: String::from("!false"),
+                expected: true,
+            },
+            Test {
+                input: String::from("!5"),
+                expected: false,
+            },
+            Test {
+                input: String::from("!!true"),
+                expected: true,
+            },
+            Test {
+                input: String::from("!!false"),
+                expected: false,
+            },
+            Test {
+                input: String::from("!!5"),
+                expected: true,
             },
         ];
 
