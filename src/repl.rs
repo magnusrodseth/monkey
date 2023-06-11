@@ -1,6 +1,7 @@
 use std::io::Write;
 
 use crate::{
+    evaluator::Evaluator,
     lexer::Lexer,
     parser::{Parser, ParserError},
 };
@@ -55,11 +56,15 @@ impl Repl {
             }
 
             match program {
-                Ok(program) => {
-                    println!("{}", program);
-                }
                 Err(_) => {
                     Repl::print_errors(parser.errors());
+                }
+                Ok(program) => {
+                    let evaluated = Evaluator::new().evaluate(program);
+                    match evaluated {
+                        Some(object) => println!("{}", object),
+                        None => {}
+                    }
                 }
             }
         }

@@ -3,7 +3,7 @@ use crate::{
     object::Object,
 };
 
-struct Evaluator {}
+pub struct Evaluator {}
 
 impl Evaluator {
     pub fn new() -> Self {
