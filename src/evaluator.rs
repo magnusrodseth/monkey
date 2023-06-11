@@ -3,6 +3,10 @@ use crate::{
     object::Object,
 };
 
+const NULL: Object = Object::Null;
+const TRUE: Object = Object::Boolean(true);
+const FALSE: Object = Object::Boolean(false);
+
 pub struct Evaluator {}
 
 impl Evaluator {
@@ -43,7 +47,19 @@ impl Evaluator {
     fn evaluate_literal(&self, literal: Literal) -> Object {
         match literal {
             Literal::Integer(value) => Object::Integer(value),
-            _ => Object::Null,
+            Literal::Boolean(value) => self.native_boolean_to_boolean_object(value),
+            _ => NULL,
+        }
+    }
+
+    /// We need to convert Rust's native boolean type to our own Boolean object.
+    /// We use global constants for TRUE and FALSE, in order to only allocate them once.
+    /// This way, we don't have the create a new Boolean object every time we evaluate a boolean expression.
+    fn native_boolean_to_boolean_object(&self, input: bool) -> Object {
+        if input {
+            TRUE
+        } else {
+            FALSE
         }
     }
 }
@@ -67,6 +83,15 @@ mod tests {
             match $object {
                 Some(Object::Integer(value)) => assert_eq!(value, $expected),
                 _ => panic!("Object is not Integer. got={:?}", $object),
+            }
+        };
+    }
+
+    macro_rules! assert_boolean_object {
+        ($object:expr, $expected:expr) => {
+            match $object {
+                Some(Object::Boolean(value)) => assert_eq!(value, $expected),
+                _ => panic!("Object is not Boolean. got={:?}", $object),
             }
         };
     }
@@ -99,6 +124,30 @@ mod tests {
         for test in tests {
             let evaluated = evaluate(test.input);
             assert_integer_object!(evaluated, test.expected);
+        }
+    }
+
+    #[test]
+    fn evaluate_boolean() {
+        struct Test {
+            input: String,
+            expected: bool,
+        }
+
+        let tests = vec![
+            Test {
+                input: String::from("true"),
+                expected: true,
+            },
+            Test {
+                input: String::from("false"),
+                expected: false,
+            },
+        ];
+
+        for test in tests {
+            let evaluated = evaluate(test.input);
+            assert_boolean_object!(evaluated, test.expected);
         }
     }
 }
