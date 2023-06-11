@@ -1,5 +1,5 @@
 use crate::{
-    ast::{Expression, Infix, Literal, Prefix, Program, Statement},
+    ast::{BlockStatement, Expression, Infix, Literal, Prefix, Program, Statement},
     object::Object,
 };
 
@@ -37,7 +37,19 @@ impl Evaluator {
         }
     }
 
-    fn evaluate_expression(&self, expression: Expression) -> Option<Object> {
+    fn evaluate_block_statement(&mut self, block: BlockStatement) -> Option<Object> {
+        let mut result = None;
+
+        for statement in block.statements {
+            match self.evaluate_statement(statement) {
+                object => result = object,
+            }
+        }
+
+        result
+    }
+
+    fn evaluate_expression(&mut self, expression: Expression) -> Option<Object> {
         match expression {
             Expression::Literal(literal) => Some(self.evaluate_literal(literal)),
             Expression::Prefix { operator, right } => {
@@ -53,6 +65,11 @@ impl Evaluator {
                 let right = self.evaluate_expression(*right)?;
                 Some(self.evaluate_infix_expression(operator, left, right))
             }
+            Expression::If {
+                condition,
+                consequence,
+                alternative,
+            } => self.evaluate_if_expression(condition, consequence, alternative),
             _ => None,
         }
     }
@@ -150,6 +167,24 @@ impl Evaluator {
             Infix::LessThanOrEqual => self.native_boolean_to_boolean_object(left <= right),
             Infix::GreaterThanOrEqual => self.native_boolean_to_boolean_object(left >= right),
             _ => NULL,
+        }
+    }
+
+    fn evaluate_if_expression(
+        &mut self,
+        condition: Box<Expression>,
+        consequence: BlockStatement,
+        alternative: Option<BlockStatement>,
+    ) -> Option<Object> {
+        let condition = self.evaluate_expression(*condition)?;
+
+        if self.is_truthy(condition) {
+            self.evaluate_block_statement(consequence)
+        } else {
+            match alternative {
+                Some(alternative) => self.evaluate_block_statement(alternative),
+                None => None,
+            }
         }
     }
 }
@@ -409,6 +444,50 @@ mod tests {
         for test in tests {
             let evaluated = evaluate(test.input);
             assert_boolean_object!(evaluated, test.expected);
+        }
+    }
+
+    #[test]
+    fn evaluate_if_else() {
+        struct Test {
+            input: String,
+            expected: Option<Object>,
+        }
+
+        let tests = vec![
+            Test {
+                input: String::from("if (true) { 10 }"),
+                expected: Some(Object::Integer(10)),
+            },
+            Test {
+                input: String::from("if (false) { 10 }"),
+                expected: None,
+            },
+            Test {
+                input: String::from("if (1) { 10 }"),
+                expected: Some(Object::Integer(10)),
+            },
+            Test {
+                input: String::from("if (1 < 2) { 10 }"),
+                expected: Some(Object::Integer(10)),
+            },
+            Test {
+                input: String::from("if (1 > 2) { 10 }"),
+                expected: None,
+            },
+            Test {
+                input: String::from("if (1 > 2) { 10 } else { 20 }"),
+                expected: Some(Object::Integer(20)),
+            },
+            Test {
+                input: String::from("if (1 < 2) { 10 } else { 20 }"),
+                expected: Some(Object::Integer(10)),
+            },
+        ];
+
+        for test in tests {
+            let evaluated = evaluate(test.input);
+            assert_eq!(evaluated, test.expected);
         }
     }
 }
