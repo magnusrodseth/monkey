@@ -95,11 +95,10 @@ impl Evaluator {
                 arguments,
             } => Some(self.evaluate_call_expression(function, arguments)),
             Expression::Index { left, index } => Some(self.evaluate_index_expression(left, index)),
-            Expression::Assign { name, value } => todo!(),
             Expression::While {
                 condition,
                 consequence,
-            } => todo!(),
+            } => self.evaluate_while_expression(condition, consequence),
         }
     }
 
@@ -145,7 +144,7 @@ impl Evaluator {
         }
     }
 
-    fn is_truthy(&self, object: Object) -> bool {
+    fn is_truthy(&self, object: &Object) -> bool {
         match object {
             Object::Null | Object::Boolean(false) => false,
             _ => true,
@@ -233,7 +232,7 @@ impl Evaluator {
     ) -> Option<Object> {
         let condition = self.evaluate_expression(*condition)?;
 
-        if self.is_truthy(condition) {
+        if self.is_truthy(&condition) {
             self.evaluate_block_statement(consequence)
         } else {
             match alternative {
@@ -428,6 +427,24 @@ impl Evaluator {
         }
 
         Object::Hash(pairs)
+    }
+
+    fn evaluate_while_expression(
+        &mut self,
+        condition: Box<Expression>,
+        consequence: BlockStatement,
+    ) -> Option<Object> {
+        let mut result = None;
+
+        while let Some(condition) = self.evaluate_expression(*condition) {
+            if self.is_truthy(&condition) {
+                result = self.evaluate_block_statement(consequence.clone());
+            } else {
+                break;
+            }
+        }
+
+        result
     }
 }
 
@@ -1169,5 +1186,20 @@ mod tests {
             let evaluated = evaluate(test.input);
             assert_eq!(evaluated, Some(test.expected));
         }
+    }
+
+    #[test]
+    fn evaluate_while() {
+        let input = String::from(
+            r#"
+            let i = 0;
+            while (i < 10) {
+                i = i + 1;
+            }
+            i
+            "#,
+        );
+
+        assert_eq!(evaluate(input), Some(Object::Integer(10)));
     }
 }

@@ -83,10 +83,6 @@ pub enum Expression {
         condition: Box<Expression>,
         consequence: BlockStatement,
     },
-    Assign {
-        name: Identifier,
-        value: Box<Expression>,
-    },
     Function {
         parameters: Vec<Identifier>,
         body: BlockStatement,
@@ -204,9 +200,6 @@ impl Display for Expression {
             Expression::Index { left, index } => {
                 write!(f, "({}[{}])", left.to_string(), index.to_string())
             }
-            Expression::Assign { name, value } => {
-                write!(f, "{} = {}", name.0, value.to_string())
-            }
             Expression::While {
                 condition,
                 consequence,
@@ -234,6 +227,8 @@ pub enum Statement {
     },
     Return(Expression),
     Expression(Expression),
+    Break,
+    Continue,
     Empty,
 }
 
@@ -246,6 +241,8 @@ impl Display for Statement {
             Statement::Return(expression) => write!(f, "return {};", expression.to_string()),
             Statement::Expression(expression) => write!(f, "{}", expression.to_string()),
             Statement::Empty => write!(f, ""),
+            Statement::Break => write!(f, "break;"),
+            Statement::Continue => write!(f, "continue;"),
         }
     }
 }

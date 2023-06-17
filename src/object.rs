@@ -23,6 +23,8 @@ pub enum Object {
     },
     Builtin(BuiltinFunction),
     Null,
+    Break,
+    Continue,
     Void,
 }
 
@@ -70,6 +72,8 @@ impl Display for Object {
                 write!(f, "{{{}}}", result)
             }
             Object::Void => write!(f, ""),
+            Object::Break => write!(f, ""),
+            Object::Continue => write!(f, ""),
         }
     }
 }

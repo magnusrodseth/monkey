@@ -1,4 +1,4 @@
-use std::{collections::HashMap, error::Error, fmt::Display};
+use std::{error::Error, fmt::Display};
 
 use crate::{
     ast::{
@@ -125,6 +125,8 @@ impl Parser {
             Token::Let => self.parse_let_statement(),
             Token::Return => self.parse_return_statement(),
             Token::Empty => Ok(Statement::Empty),
+            Token::Break => Ok(Statement::Break),
+            Token::Continue => Ok(Statement::Continue),
             _ => self.parse_expression_statement(),
         }
     }
@@ -225,9 +227,6 @@ impl Parser {
     }
 
     fn parse_expression(&mut self, precedence: Precedence) -> Option<Expression> {
-        dbg!(&self.current_token);
-        dbg!(&self.peek_token);
-
         // Parse prefix
         let mut left = match self.current_token {
             Token::Identifier(_) => self.parse_identifier_expression(),
@@ -582,9 +581,6 @@ impl Parser {
     }
 
     fn parse_while_expression(&mut self) -> Option<Expression> {
-        dbg!(&self.current_token);
-        dbg!(&self.peek_token);
-
         if !self.peek_and_expect(Token::LeftParenthesis) {
             return None;
         }
@@ -1398,22 +1394,65 @@ mod tests {
             expected: Expression,
         }
 
-        let tests = vec![Test {
-            input: "while (x < 10) { let y = 2; }",
-            expected: Expression::While {
-                condition: Box::new(Expression::Infix {
-                    left: Box::new(Expression::Identifier(Identifier("x".to_string()))),
-                    operator: Infix::LessThan,
-                    right: Box::new(Expression::Literal(Literal::Integer(10))),
-                }),
-                consequence: BlockStatement {
-                    statements: vec![Statement::Let {
-                        identifier: Identifier("y".to_string()),
-                        value: Expression::Literal(Literal::Integer(2)),
-                    }],
+        let tests = vec![
+            Test {
+                input: "while (x < 10) { let y = 2; }",
+                expected: Expression::While {
+                    condition: Box::new(Expression::Infix {
+                        left: Box::new(Expression::Identifier(Identifier("x".to_string()))),
+                        operator: Infix::LessThan,
+                        right: Box::new(Expression::Literal(Literal::Integer(10))),
+                    }),
+                    consequence: BlockStatement {
+                        statements: vec![Statement::Let {
+                            identifier: Identifier("y".to_string()),
+                            value: Expression::Literal(Literal::Integer(2)),
+                        }],
+                    },
                 },
             },
-        }];
+            Test {
+                input: "while (x < 10) { let y = 2; break; }",
+                expected: Expression::While {
+                    condition: Box::new(Expression::Infix {
+                        left: Box::new(Expression::Identifier(Identifier("x".to_string()))),
+                        operator: Infix::LessThan,
+                        right: Box::new(Expression::Literal(Literal::Integer(10))),
+                    }),
+                    consequence: BlockStatement {
+                        statements: vec![
+                            Statement::Let {
+                                identifier: Identifier("y".to_string()),
+                                value: Expression::Literal(Literal::Integer(2)),
+                            },
+                            Statement::Break,
+                        ],
+                    },
+                },
+            },
+            Test {
+                input: "while (x < 10) { y = y + 1; }",
+                expected: Expression::While {
+                    condition: Box::new(Expression::Infix {
+                        left: Box::new(Expression::Identifier(Identifier("x".to_string()))),
+                        operator: Infix::LessThan,
+                        right: Box::new(Expression::Literal(Literal::Integer(10))),
+                    }),
+                    consequence: BlockStatement {
+                        statements: vec![
+                            Statement::Expression(Expression::Identifier(Identifier(
+                                "y".to_string(),
+                            ))),
+                            Statement::Expression(Expression::Infix {
+                                left: Box::new(Expression::Identifier(Identifier("y".to_string()))),
+                                operator: Infix::Plus,
+                                right: Box::new(Expression::Literal(Literal::Integer(1))),
+                            }),
+                        ],
+                    },
+                },
+            },
+        ];
 
         for test in tests {
             let lexer = Lexer::new(test.input.into());
@@ -1427,10 +1466,10 @@ mod tests {
                     panic!("Parser error");
                 }
                 Ok(program) => {
-                    assert_eq!(program.statements.len(), 1);
+                    pretty_assertions::assert_eq!(program.statements.len(), 1);
                     let statement = program.statements.first().unwrap();
 
-                    assert_eq!(Statement::Expression(test.expected), *statement);
+                    pretty_assertions::assert_eq!(Statement::Expression(test.expected), *statement);
                 }
             }
         }
