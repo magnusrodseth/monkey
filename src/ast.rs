@@ -79,6 +79,16 @@ pub enum Expression {
         consequence: BlockStatement,
         alternative: Option<BlockStatement>,
     },
+    For {
+        let_statement: Box<Statement>,
+        condition: Box<Expression>,
+        update: Box<Expression>,
+        body: BlockStatement,
+    },
+    Assign {
+        name: Identifier,
+        value: Box<Expression>,
+    },
     Function {
         parameters: Vec<Identifier>,
         body: BlockStatement,
@@ -195,6 +205,24 @@ impl Display for Expression {
             }
             Expression::Index { left, index } => {
                 write!(f, "({}[{}])", left.to_string(), index.to_string())
+            }
+            Expression::For {
+                let_statement,
+                condition,
+                update,
+                body,
+            } => {
+                write!(
+                    f,
+                    "for ({}; {}; {}) {}",
+                    let_statement.to_string(),
+                    condition.to_string(),
+                    update.to_string(),
+                    body.to_string()
+                )
+            }
+            Expression::Assign { name, value } => {
+                write!(f, "{} = {}", name.0, value.to_string())
             }
         }
     }

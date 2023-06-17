@@ -130,8 +130,6 @@ impl Parser {
     }
 
     fn parse_let_statement(&mut self) -> Result<Statement, ParserError> {
-        let token = self.current_token.clone();
-
         // Peek the value of the upcoming identifier. If this fails, then the let statement is invalid.
         let identifier_token = if let Token::Identifier(value) = self.peek_token.clone() {
             value
@@ -227,6 +225,9 @@ impl Parser {
     }
 
     fn parse_expression(&mut self, precedence: Precedence) -> Option<Expression> {
+        dbg!(&self.current_token);
+        dbg!(&self.peek_token);
+
         // Parse prefix
         let mut left = match self.current_token {
             Token::Identifier(_) => self.parse_identifier_expression(),

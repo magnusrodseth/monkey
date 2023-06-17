@@ -95,6 +95,13 @@ impl Evaluator {
                 arguments,
             } => Some(self.evaluate_call_expression(function, arguments)),
             Expression::Index { left, index } => Some(self.evaluate_index_expression(left, index)),
+            Expression::For {
+                let_statement,
+                condition,
+                update,
+                body,
+            } => todo!(),
+            Expression::Assign { name, value } => todo!(),
         }
     }
 

@@ -69,6 +69,7 @@ impl Lexer {
             '(' => Token::LeftParenthesis,
             ')' => Token::RightParenthesis,
             ',' => Token::Comma,
+            '.' => self.handle_peek('.', Token::Range, Token::Illegal),
             '+' => Token::Plus,
             '-' => Token::Minus,
             '*' => Token::Asterisk,
@@ -135,6 +136,10 @@ impl Lexer {
             "else" => Token::Else,
             "return" => Token::Return,
             "for" => Token::For,
+            "while" => Token::While,
+            "break" => Token::Break,
+            "continue" => Token::Continue,
+            "in" => Token::In,
             _ => Token::Identifier(identifier),
         }
     }
@@ -384,32 +389,124 @@ mod tests {
     #[test]
     fn for_loop() {
         let input = r#"
-            for (let i = 0; i < 10; i = i + 1) {
-                i;
+            for i in 1..10 {
+              i = i + 1;
             }"#;
 
         let expected = vec![
             Token::For,
-            Token::LeftParenthesis,
-            Token::Let,
             Token::Identifier(String::from("i")),
-            Token::Assign,
-            Token::Integer(0),
-            Token::Semicolon,
-            Token::Identifier(String::from("i")),
-            Token::LessThan,
+            Token::In,
+            Token::Integer(1),
+            Token::Range,
             Token::Integer(10),
-            Token::Semicolon,
+            Token::LeftBrace,
             Token::Identifier(String::from("i")),
             Token::Assign,
             Token::Identifier(String::from("i")),
             Token::Plus,
             Token::Integer(1),
-            Token::RightParenthesis,
-            Token::LeftBrace,
-            Token::Identifier(String::from("i")),
             Token::Semicolon,
             Token::RightBrace,
+        ];
+
+        assert_lexer_eq!(input, expected);
+    }
+
+    #[test]
+    fn while_loop() {
+        let input = r#"
+            while (x < 10) {
+                x = x + 1;
+            }"#;
+
+        let expected = vec![
+            Token::While,
+            Token::LeftParenthesis,
+            Token::Identifier(String::from("x")),
+            Token::LessThan,
+            Token::Integer(10),
+            Token::RightParenthesis,
+            Token::LeftBrace,
+            Token::Identifier(String::from("x")),
+            Token::Assign,
+            Token::Identifier(String::from("x")),
+            Token::Plus,
+            Token::Integer(1),
+            Token::Semicolon,
+            Token::RightBrace,
+        ];
+
+        assert_lexer_eq!(input, expected);
+    }
+
+    #[test]
+    fn break_statement() {
+        let input = r#"
+            while (x < 10) {
+                break;
+            }"#;
+
+        let expected = vec![
+            Token::While,
+            Token::LeftParenthesis,
+            Token::Identifier(String::from("x")),
+            Token::LessThan,
+            Token::Integer(10),
+            Token::RightParenthesis,
+            Token::LeftBrace,
+            Token::Break,
+            Token::Semicolon,
+            Token::RightBrace,
+        ];
+
+        assert_lexer_eq!(input, expected);
+    }
+
+    #[test]
+    fn continue_statement() {
+        let input = r#"
+            while (x < 10) {
+                continue;
+            }"#;
+
+        let expected = vec![
+            Token::While,
+            Token::LeftParenthesis,
+            Token::Identifier(String::from("x")),
+            Token::LessThan,
+            Token::Integer(10),
+            Token::RightParenthesis,
+            Token::LeftBrace,
+            Token::Continue,
+            Token::Semicolon,
+            Token::RightBrace,
+        ];
+
+        assert_lexer_eq!(input, expected);
+    }
+
+    #[test]
+    fn in_and_range() {
+        let input = r#"
+            1 in [1, 2, 3];
+            1..3
+            "#;
+
+        let expected = vec![
+            Token::Integer(1),
+            Token::In,
+            Token::LeftBracket,
+            Token::Integer(1),
+            Token::Comma,
+            Token::Integer(2),
+            Token::Comma,
+            Token::Integer(3),
+            Token::RightBracket,
+            Token::Semicolon,
+            Token::Integer(1),
+            Token::Range,
+            Token::Integer(3),
         ];
 
         assert_lexer_eq!(input, expected);

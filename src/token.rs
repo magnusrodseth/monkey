@@ -30,6 +30,7 @@ pub enum Token {
     GreaterThanOrEqual,
     Equal,
     NotEqual,
+    Range,
 
     // Delimiters
     Comma,
@@ -47,6 +48,10 @@ pub enum Token {
     Let,
     Return,
     For,
+    While,
+    Break,
+    Continue,
+    In,
 }
 
 impl Token {
@@ -86,6 +91,11 @@ impl Token {
             Token::RightBracket => "]".into(),
             Token::Colon => ":".into(),
             Token::For => "for".into(),
+            Token::While => "while".into(),
+            Token::Break => "break".into(),
+            Token::Continue => "continue".into(),
+            Token::In => "in".into(),
+            Token::Range => "..".into(),
         }
     }
 }
@@ -127,6 +137,11 @@ impl Display for Token {
             Token::RightBracket => write!(f, "RightBracket"),
             Token::Colon => write!(f, "Colon"),
             Token::For => write!(f, "For"),
+            Token::While => write!(f, "While"),
+            Token::Break => write!(f, "Break"),
+            Token::Continue => write!(f, "Continue"),
+            Token::In => write!(f, "In"),
+            Token::Range => write!(f, "Range"),
         }
     }
 }
