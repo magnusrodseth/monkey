@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{collections::HashMap, fmt::Display};
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Clone)]
 pub struct Identifier(pub String);
@@ -114,6 +114,25 @@ impl Display for Expression {
 
                     write!(f, "{}", string)
                 }
+                Literal::Hash(map) => {
+                    let mut string = String::new();
+
+                    string.push_str("{");
+
+                    for (index, (key, value)) in map.iter().enumerate() {
+                        string.push_str(&key.to_string());
+                        string.push_str(": ");
+                        string.push_str(&value.to_string());
+
+                        if index != map.len() - 1 {
+                            string.push_str(", ");
+                        }
+                    }
+
+                    string.push_str("}");
+
+                    write!(f, "{}", string)
+                }
             },
             Expression::Prefix { operator, right } => write!(f, "({}{})", operator, right),
             Expression::Infix {
@@ -187,6 +206,7 @@ pub enum Literal {
     Boolean(bool),
     String(String),
     Array(Vec<Expression>),
+    Hash(Vec<(Expression, Expression)>),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]

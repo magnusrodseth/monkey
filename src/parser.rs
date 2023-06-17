@@ -1,4 +1,4 @@
-use std::{error::Error, fmt::Display};
+use std::{collections::HashMap, error::Error, fmt::Display};
 
 use crate::{
     ast::{
@@ -238,6 +238,7 @@ impl Parser {
             Token::LeftParenthesis => self.parse_grouped_expression(),
             Token::If => self.parse_if_expression(),
             Token::Function => self.parse_function_literal(),
+            Token::LeftBrace => self.parse_hash_literal(),
             _ => {
                 self.errors.push(ParserError::new(
                     format!(
@@ -540,6 +541,42 @@ impl Parser {
             left: Box::new(expect),
             index: Box::new(index),
         })
+    }
+
+    fn parse_hash_literal(&mut self) -> Option<Expression> {
+        let mut pairs: Vec<(Expression, Expression)> = Vec::new();
+
+        while !self.peek_token_is(&Token::RightBrace) {
+            self.next_token();
+
+            let key = match self.parse_expression(Precedence::Lowest) {
+                Some(key) => key,
+                None => return None,
+            };
+
+            if !self.peek_and_expect(Token::Colon) {
+                return None;
+            }
+
+            self.next_token();
+
+            let value = match self.parse_expression(Precedence::Lowest) {
+                Some(value) => value,
+                None => return None,
+            };
+
+            pairs.push((key, value));
+
+            if !self.peek_token_is(&Token::RightBrace) && !self.peek_and_expect(Token::Comma) {
+                return None;
+            }
+        }
+
+        if !self.peek_and_expect(Token::RightBrace) {
+            return None;
+        }
+
+        Some(Expression::Literal(Literal::Hash(pairs)))
     }
 }
 
@@ -1239,6 +1276,90 @@ mod tests {
                     }),
                     *statement
                 );
+            }
+        }
+    }
+
+    #[test]
+    fn hash() {
+        struct Test {
+            input: &'static str,
+            expected: Vec<(Expression, Expression)>,
+        }
+
+        let tests = vec![
+            Test {
+                input: r#"{"one": 1, "two": 2, "three": 3}"#,
+                expected: vec![
+                    (
+                        Expression::Literal(Literal::String("one".to_string())),
+                        Expression::Literal(Literal::Integer(1)),
+                    ),
+                    (
+                        Expression::Literal(Literal::String("two".to_string())),
+                        Expression::Literal(Literal::Integer(2)),
+                    ),
+                    (
+                        Expression::Literal(Literal::String("three".to_string())),
+                        Expression::Literal(Literal::Integer(3)),
+                    ),
+                ],
+            },
+            Test {
+                input: r#"{}"#,
+                expected: vec![],
+            },
+            Test {
+                input: r#"{"one": 0 + 1, "two": 10 - 8, "three": 15 / 5}"#,
+                expected: vec![
+                    (
+                        Expression::Literal(Literal::String("one".to_string())),
+                        Expression::Infix {
+                            left: Box::new(Expression::Literal(Literal::Integer(0))),
+                            operator: Infix::Plus,
+                            right: Box::new(Expression::Literal(Literal::Integer(1))),
+                        },
+                    ),
+                    (
+                        Expression::Literal(Literal::String("two".to_string())),
+                        Expression::Infix {
+                            left: Box::new(Expression::Literal(Literal::Integer(10))),
+                            operator: Infix::Minus,
+                            right: Box::new(Expression::Literal(Literal::Integer(8))),
+                        },
+                    ),
+                    (
+                        Expression::Literal(Literal::String("three".to_string())),
+                        Expression::Infix {
+                            left: Box::new(Expression::Literal(Literal::Integer(15))),
+                            operator: Infix::Divide,
+                            right: Box::new(Expression::Literal(Literal::Integer(5))),
+                        },
+                    ),
+                ],
+            },
+        ];
+
+        for test in tests {
+            let lexer = Lexer::new(test.input.into());
+            let mut parser = Parser::new(lexer);
+            let program = parser.parse();
+
+            print_parser_errors!(parser.errors());
+
+            match program {
+                Err(_) => {
+                    panic!("Parser error");
+                }
+                Ok(program) => {
+                    assert_eq!(program.statements.len(), 1);
+                    let statement = program.statements.first().unwrap();
+
+                    assert_eq!(
+                        Statement::Expression(Expression::Literal(Literal::Hash(test.expected))),
+                        *statement
+                    );
+                }
             }
         }
     }

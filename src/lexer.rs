@@ -64,6 +64,7 @@ impl Lexer {
         let token = match self.current_char {
             '=' => self.handle_peek('=', Token::Equal, Token::Assign),
             ';' => Token::Semicolon,
+            ':' => Token::Colon,
             '(' => Token::LeftParenthesis,
             ')' => Token::RightParenthesis,
             ',' => Token::Comma,
@@ -330,6 +331,21 @@ mod tests {
             Token::NotEqual,
             Token::Integer(9),
             Token::Semicolon,
+        ];
+
+        assert_lexer_eq!(input, expected);
+    }
+
+    #[test]
+    fn hash() {
+        let input = "{ \"foo\": \"bar\" }";
+
+        let expected = vec![
+            Token::LeftBrace,
+            Token::String(String::from("foo")),
+            Token::Colon,
+            Token::String(String::from("bar")),
+            Token::RightBrace,
         ];
 
         assert_lexer_eq!(input, expected);

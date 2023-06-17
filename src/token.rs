@@ -34,6 +34,7 @@ pub enum Token {
     // Delimiters
     Comma,
     Semicolon,
+    Colon,
     LeftParenthesis,
     RightParenthesis,
     LeftBrace,
@@ -82,6 +83,7 @@ impl Token {
             Token::String(string) => format!("{}", string),
             Token::LeftBracket => "[".into(),
             Token::RightBracket => "]".into(),
+            Token::Colon => ":".into(),
         }
     }
 }
@@ -121,6 +123,7 @@ impl Display for Token {
             Token::String(string) => write!(f, "{}", string),
             Token::LeftBracket => write!(f, "LeftBracket"),
             Token::RightBracket => write!(f, "RightBracket"),
+            Token::Colon => write!(f, "Colon"),
         }
     }
 }
