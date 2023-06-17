@@ -1,7 +1,8 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::{
     ast::{BlockStatement, Expression, Identifier, Infix, Literal, Prefix, Program, Statement},
+    builtin::new_builtins,
     environment::Environment,
     object::Object,
 };
@@ -12,11 +13,15 @@ const FALSE: Object = Object::Boolean(false);
 
 pub struct Evaluator {
     environment: Rc<RefCell<Environment>>,
+    builtins: HashMap<String, Object>,
 }
 
 impl Evaluator {
     pub fn new(environment: Rc<RefCell<Environment>>) -> Self {
-        Self { environment }
+        Self {
+            environment,
+            builtins: new_builtins(),
+        }
     }
 
     pub fn evaluate(&mut self, program: Program) -> Option<Object> {
@@ -265,9 +270,14 @@ impl Evaluator {
 
     fn evaluate_identifier(&self, identifier: Identifier) -> Object {
         let Identifier(identifier) = identifier;
+
+        if let Some(builtin) = self.builtins.get(identifier.as_str()) {
+            return builtin.clone();
+        }
+
         match self.environment.borrow_mut().get(identifier.clone()) {
             Some(value) => value.clone(),
-            None => Object::Error(format!("identifier not found: {}", identifier)),
+            _ => Object::Error(format!("identifier not found: {}", identifier)),
         }
     }
 
@@ -298,6 +308,7 @@ impl Evaluator {
                 body,
                 environment,
             }) => (parameters, body, environment),
+            Some(Object::Builtin(function)) => return function(arguments),
             Some(object) => return self.error(format!("not a function: {}", object)),
             None => return NULL,
         };
@@ -880,5 +891,41 @@ mod tests {
     fn evaluate_string_concatenation() {
         let input = String::from(r#""Hello" + " " + "World!""#);
         assert_string_object!(evaluate(input.clone()), "Hello World!");
+    }
+
+    #[test]
+    fn evaluate_builtin_functions() {
+        struct Test {
+            input: String,
+            expected: Object,
+        }
+
+        let tests = vec![
+            Test {
+                input: String::from(r#"len("")"#),
+                expected: Object::Integer(0),
+            },
+            Test {
+                input: String::from(r#"len("four")"#),
+                expected: Object::Integer(4),
+            },
+            Test {
+                input: String::from(r#"len("hello world")"#),
+                expected: Object::Integer(11),
+            },
+            Test {
+                input: String::from(r#"len(1)"#),
+                expected: Object::Error(String::from("argument to `len` not supported, got 1")),
+            },
+            Test {
+                input: String::from(r#"len("one", "two")"#),
+                expected: Object::Error(String::from("wrong number of arguments. got=2, want=1")),
+            },
+        ];
+
+        for test in tests {
+            let evaluated = evaluate(test.input);
+            assert_eq!(evaluated, Some(test.expected));
+        }
     }
 }

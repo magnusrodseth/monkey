@@ -5,6 +5,8 @@ use crate::{
     environment::Environment,
 };
 
+type BuiltinFunction = fn(Vec<Object>) -> Object;
+
 #[derive(PartialEq, Clone, Eq, Debug)]
 pub enum Object {
     Integer(i64),
@@ -17,6 +19,7 @@ pub enum Object {
         body: BlockStatement,
         environment: Rc<RefCell<Environment>>,
     },
+    Builtin(BuiltinFunction),
     Null,
 }
 
@@ -43,6 +46,7 @@ impl Display for Object {
                 body
             ),
             Object::String(string) => write!(f, "{}", string),
+            Object::Builtin(built_in) => todo!("to_string for built in"),
         }
     }
 }
