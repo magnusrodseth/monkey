@@ -94,7 +94,7 @@ impl Evaluator {
                 function,
                 arguments,
             } => Some(self.evaluate_call_expression(function, arguments)),
-            Expression::Index { left, index } => todo!(),
+            Expression::Index { left, index } => Some(self.evaluate_index_expression(left, index)),
         }
     }
 
@@ -365,6 +365,33 @@ impl Evaluator {
             .collect::<Vec<_>>();
 
         Object::Array(elements)
+    }
+
+    fn evaluate_index_expression(
+        &mut self,
+        left: Box<Expression>,
+        index: Box<Expression>,
+    ) -> Object {
+        let left = match self.evaluate_expression(*left) {
+            Some(object) => object,
+            _ => return NULL,
+        };
+
+        let index = match self.evaluate_expression(*index) {
+            Some(object) => object,
+            _ => return NULL,
+        };
+
+        match (left, index) {
+            (Object::Array(elements), Object::Integer(index)) => {
+                if index < 0 || index >= elements.len() as i64 {
+                    return NULL;
+                }
+
+                elements[index as usize].clone()
+            }
+            _ => NULL,
+        }
     }
 }
 
@@ -956,6 +983,64 @@ mod tests {
                 assert_integer_object!(Some(elements[2].clone()), 6);
             }
             _ => panic!("object is not Array. got={:?}", evaluated),
+        }
+    }
+
+    #[test]
+    fn evaluate_array_index_expressions() {
+        struct Test {
+            input: String,
+            expected: Object,
+        }
+
+        let tests = vec![
+            Test {
+                input: String::from("[1, 2, 3][0]"),
+                expected: Object::Integer(1),
+            },
+            Test {
+                input: String::from("[1, 2, 3][1]"),
+                expected: Object::Integer(2),
+            },
+            Test {
+                input: String::from("[1, 2, 3][2]"),
+                expected: Object::Integer(3),
+            },
+            Test {
+                input: String::from("let i = 0; [1][i];"),
+                expected: Object::Integer(1),
+            },
+            Test {
+                input: String::from("[1, 2, 3][1 + 1];"),
+                expected: Object::Integer(3),
+            },
+            Test {
+                input: String::from("let myArray = [1, 2, 3]; myArray[2];"),
+                expected: Object::Integer(3),
+            },
+            Test {
+                input: String::from(
+                    "let myArray = [1, 2, 3]; myArray[0] + myArray[1] + myArray[2];",
+                ),
+                expected: Object::Integer(6),
+            },
+            Test {
+                input: String::from("let myArray = [1, 2, 3]; let i = myArray[0]; myArray[i]"),
+                expected: Object::Integer(2),
+            },
+            Test {
+                input: String::from("[1, 2, 3][3]"),
+                expected: Object::Null,
+            },
+            Test {
+                input: String::from("[1, 2, 3][-1]"),
+                expected: Object::Null,
+            },
+        ];
+
+        for test in tests {
+            let evaluated = evaluate(test.input);
+            assert_eq!(evaluated, Some(test.expected));
         }
     }
 }
