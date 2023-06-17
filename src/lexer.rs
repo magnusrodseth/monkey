@@ -8,6 +8,7 @@ pub struct Lexer {
 }
 
 const EOF: char = '\0';
+const NEWLINE: char = '\n';
 
 impl Lexer {
     fn read_char(&mut self) {
@@ -71,7 +72,17 @@ impl Lexer {
             '+' => Token::Plus,
             '-' => Token::Minus,
             '*' => Token::Asterisk,
-            '/' => Token::Slash,
+            '/' => {
+                if self.peek_char() == '/' {
+                    self.read_char();
+                    while self.current_char != NEWLINE && self.current_char != EOF {
+                        self.read_char();
+                    }
+                    self.next_token()
+                } else {
+                    Token::Slash
+                }
+            }
             '!' => self.handle_peek('=', Token::NotEqual, Token::Bang),
             '<' => self.handle_peek('=', Token::LessThanOrEqual, Token::LessThan),
             '>' => self.handle_peek('=', Token::GreaterThanOrEqual, Token::GreaterThan),
@@ -346,6 +357,24 @@ mod tests {
             Token::Colon,
             Token::String(String::from("bar")),
             Token::RightBrace,
+        ];
+
+        assert_lexer_eq!(input, expected);
+    }
+
+    #[test]
+    fn comment() {
+        let input = r#"
+            // This is a comment
+            let five = 5;
+        "#;
+
+        let expected = vec![
+            Token::Let,
+            Token::Identifier(String::from("five")),
+            Token::Assign,
+            Token::Integer(5),
+            Token::Semicolon,
         ];
 
         assert_lexer_eq!(input, expected);

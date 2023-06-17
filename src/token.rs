@@ -6,6 +6,7 @@ pub enum Token {
     Illegal,
     Empty,
     EOF,
+    Comment,
 
     // Identifiers and literals
     Identifier(String),
@@ -84,6 +85,7 @@ impl Token {
             Token::LeftBracket => "[".into(),
             Token::RightBracket => "]".into(),
             Token::Colon => ":".into(),
+            Token::Comment => "//".into(),
         }
     }
 }
@@ -124,6 +126,7 @@ impl Display for Token {
             Token::LeftBracket => write!(f, "LeftBracket"),
             Token::RightBracket => write!(f, "RightBracket"),
             Token::Colon => write!(f, "Colon"),
+            Token::Comment => write!(f, "Comment"),
         }
     }
 }
