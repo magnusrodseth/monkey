@@ -1,0 +1,11 @@
+print("The length of 'Hello World' is ", len("Hello World"))
+
+let x = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+print("x has ", len(x), " elements: ", x);
+print("The first element of x is ", first(x));
+print("The last element of x is ", last(x));
+print("Calling `rest` on x returns ", rest(x));
+print("Calling `rest` on `rest` of x returns ", rest(rest(x)));
+print("Called `push` on x with 11 returns ", push(x, 11));
+
+print("We can also stringify values using `str`: ", str(x));

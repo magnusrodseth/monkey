@@ -1,0 +1,7 @@
+let makeGreeter = fn(greeting) { fn(name) { greeting + " " + name + "!" } };
+
+let hello = makeGreeter("Hello");
+let goodbye = makeGreeter("Goodbye");
+
+print(hello("world"));
+print(goodbye("world"));

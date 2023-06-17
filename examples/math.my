@@ -1,0 +1,17 @@
+let add = fn (x, y) { return x + y; };
+
+print("1 + 2 = ", add(1, 2));
+print("(5 + 10 * 2 + 15 / 3) * 2 + -10 = ", (5 + 10 * 2 + 15 / 3) * 2 + -10);
+
+let max = fn(x, y) { if (x > y) { x } else { y } };
+
+let a = -5;
+let b = 10;
+print("max of ", a, " and ", b, " is ", max(a, b));
+
+let factorial = fn(n) { 
+  if (n == 0) { 1 } 
+  else { n * factorial(n - 1) } 
+};
+print("factorial of ", b, " is ", factorial(b));
+

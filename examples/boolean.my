@@ -1,0 +1,22 @@
+let evaluate = fn (value) {
+    if (value) {
+      print(str(value) + " is truthy");
+    } else {
+      print(str(value) + " is falsy");
+    }
+}
+
+evaluate(true);
+evaluate(false);
+evaluate(5);
+evaluate(-5);
+evaluate(0);
+evaluate("");
+evaluate("hello");
+
+print("(10 + 2) * 30 == 300 + 20 * 3 evaluates to ", (10 + 2) * 30 == 300 + 20 * 3);
+
+let a = 10;
+let c = 20;
+let d = if (c > a) { 99 } else { 100 };
+print("When a is ", a, " and c is ", c, ", d is ", d);

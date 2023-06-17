@@ -1,0 +1,34 @@
+let map = fn(arr, f) {
+  let iter = fn(arr, accumulated) { 
+    if (len(arr) == 0) {
+      accumulated
+    } else {
+      iter(rest(arr), push(accumulated, f(first(arr))));
+    }
+  };
+
+  iter(arr, []);
+}
+
+let a = [1, 2, 3, 4];
+let double = fn(x) { x * 2 };
+print("The list `a` has the values: ", a);
+print("We can map a function over a list: ", map(a, double));
+
+let reduce = fn(arr, initial, f) { 
+  let iter = fn(arr, result) {
+    if (len(arr) == 0) { 
+      result
+    } else {
+      iter(rest(arr), f(result, first(arr)));
+    } 
+  };
+  
+  iter(arr, initial);
+};
+
+let sum = fn(arr) {
+  reduce(arr, 0, fn(initial, el) { initial + el });
+};
+
+print("With `a` being ", a, ", we can use the definition of `reduce` to create a `sum` for elements of `a`: ", sum(a));

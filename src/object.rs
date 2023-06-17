@@ -49,7 +49,7 @@ impl Display for Object {
                 body
             ),
             Object::String(string) => write!(f, "{}", string),
-            Object::Builtin(_) => write!(f, "<builtin function>"),
+            Object::Builtin(function) => write!(f, "<builtin function>"),
             Object::Array(array) => {
                 let elements = array
                     .iter()

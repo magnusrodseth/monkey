@@ -11,6 +11,7 @@ pub fn new_builtins() -> HashMap<String, Object> {
     builtins.insert("rest".to_string(), Object::Builtin(rest));
     builtins.insert("push".to_string(), Object::Builtin(push));
     builtins.insert("print".to_string(), Object::Builtin(print));
+    builtins.insert("str".to_string(), Object::Builtin(str));
 
     builtins
 }
@@ -19,6 +20,8 @@ fn len(args: Vec<Object>) -> Object {
     match args.len() {
         1 => match &args[0] {
             Object::String(string) => Object::Integer(string.len() as i64),
+            Object::Array(array) => Object::Integer(array.len() as i64),
+            Object::Hash(hash) => Object::Integer(hash.len() as i64),
             _ => Object::Error(format!("argument to `len` not supported, got {}", args[0])),
         },
         _ => Object::Error(format!(
@@ -107,7 +110,46 @@ fn push(args: Vec<Object>) -> Object {
 
 fn print(args: Vec<Object>) -> Object {
     for arg in args {
-        println!("{}", arg);
+        print!("{}", arg);
     }
+    println!();
     Object::Void
+}
+
+fn str(args: Vec<Object>) -> Object {
+    match args.len() {
+        1 => match &args[0] {
+            Object::Integer(integer) => Object::String(integer.to_string()),
+            Object::String(string) => Object::String(string.to_string()),
+            Object::Boolean(boolean) => Object::String(boolean.to_string()),
+            Object::Array(array) => {
+                let mut string = String::from("[");
+                for i in 0..array.len() {
+                    string.push_str(&array[i].to_string());
+                    if i != array.len() - 1 {
+                        string.push_str(", ");
+                    }
+                }
+                string.push_str("]");
+                Object::String(string)
+            }
+            Object::Hash(hash) => {
+                let mut string = String::from("{");
+                let mut pairs = Vec::new();
+                for (key, value) in hash {
+                    pairs.push(format!("{}: {}", key, value));
+                }
+                string.push_str(&pairs.join(", "));
+                string.push_str("}");
+                Object::String(string)
+            }
+            Object::Null => Object::String("null".to_string()),
+            Object::Void => Object::String("void".to_string()),
+            _ => Object::Error(format!("argument to `str` not supported, got {}", args[0])),
+        },
+        _ => Object::Error(format!(
+            "wrong number of arguments. got={}, want=1",
+            args.len()
+        )),
+    }
 }
