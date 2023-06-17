@@ -1,4 +1,4 @@
-use std::fmt::{format, Display};
+use std::fmt::Display;
 
 #[derive(Debug, PartialEq, Clone, Eq, Hash)]
 pub enum Token {
@@ -11,6 +11,7 @@ pub enum Token {
     Identifier(String),
     Integer(i64),
     Boolean(bool),
+    String(String),
 
     // Statements
     Assign,
@@ -76,6 +77,7 @@ impl Token {
             Token::Empty => "".into(),
             Token::LessThanOrEqual => "<=".into(),
             Token::GreaterThanOrEqual => ">=".into(),
+            Token::String(string) => format!("{}", string),
         }
     }
 }
@@ -112,6 +114,7 @@ impl Display for Token {
             Token::Empty => write!(f, "Empty"),
             Token::LessThanOrEqual => write!(f, "LessThanOrEqual"),
             Token::GreaterThanOrEqual => write!(f, "GreaterThanOrEqual"),
+            Token::String(string) => write!(f, "{}", string),
         }
     }
 }

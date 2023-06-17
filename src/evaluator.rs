@@ -97,6 +97,7 @@ impl Evaluator {
         match literal {
             Literal::Integer(value) => Object::Integer(value),
             Literal::Boolean(value) => self.native_boolean_to_boolean_object(value),
+            Literal::String(value) => Object::String(value),
             _ => NULL,
         }
     }
@@ -351,6 +352,15 @@ mod tests {
             match $object {
                 Some(Object::Boolean(value)) => assert_eq!(value, $expected),
                 _ => panic!("Object is not Boolean. got={:?}", $object),
+            }
+        };
+    }
+
+    macro_rules! assert_string_object {
+        ($object:expr, $expected:expr) => {
+            match $object {
+                Some(Object::String(value)) => assert_eq!(value, $expected),
+                _ => panic!("Object is not String. got={:?}", $object),
             }
         };
     }
@@ -835,5 +845,11 @@ mod tests {
         );
 
         assert_integer_object!(evaluate(input.clone()), 4);
+    }
+
+    #[test]
+    fn evaluate_string() {
+        let input = String::from(r#""Hello World!""#);
+        assert_string_object!(evaluate(input.clone()), "Hello World!");
     }
 }

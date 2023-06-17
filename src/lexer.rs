@@ -77,6 +77,10 @@ impl Lexer {
             '{' => Token::LeftBrace,
             '}' => Token::RightBrace,
             EOF => Token::EOF,
+            '"' => {
+                let string = self.read_string();
+                Token::String(string)
+            }
             _ => {
                 read_next_char = false;
                 if self.is_letter() {
@@ -145,6 +149,19 @@ impl Lexer {
                 .expect("Error reading character")
         }
     }
+
+    fn read_string(&mut self) -> String {
+        let position = self.position + 1;
+
+        loop {
+            self.read_char();
+            if self.current_char == '"' || self.current_char == EOF {
+                break;
+            }
+        }
+
+        self.input[position..self.position].to_string()
+    }
 }
 
 #[cfg(test)]
@@ -198,7 +215,7 @@ mod tests {
     }
 
     #[test]
-    fn identifiers_keywords_integers() {
+    fn identifiers_keywords_integers_strings() {
         let input = "
             let five = 5;
             let ten = 10;
@@ -206,6 +223,8 @@ mod tests {
                 x + y;
             };
             let result = add(five, ten);
+            \"foobar\"
+            \"foo bar\"
         ";
 
         let expected = vec![
@@ -245,6 +264,8 @@ mod tests {
             Token::Identifier(String::from("ten")),
             Token::RightParenthesis,
             Token::Semicolon,
+            Token::String(String::from("foobar")),
+            Token::String(String::from("foo bar")),
         ];
 
         assert_lexer_eq!(input, expected);

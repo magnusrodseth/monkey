@@ -9,6 +9,7 @@ use crate::{
 pub enum Object {
     Integer(i64),
     Boolean(bool),
+    String(String),
     Return(Box<Object>),
     Error(String),
     Function {
@@ -41,6 +42,7 @@ impl Display for Object {
                     .join(", "),
                 body
             ),
+            Object::String(string) => write!(f, "{}", string),
         }
     }
 }

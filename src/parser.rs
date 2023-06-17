@@ -230,6 +230,7 @@ impl Parser {
         let mut left = match self.current_token {
             Token::Identifier(_) => self.parse_identifier_expression(),
             Token::Integer(_) => self.parse_integer_literal(),
+            Token::String(_) => self.parse_string_literal(),
             Token::Boolean(_) => self.parse_boolean(),
             Token::Bang | Token::Minus | Token::Plus => self.parse_prefix(),
             Token::LeftParenthesis => self.parse_grouped_expression(),
@@ -499,6 +500,13 @@ impl Parser {
         }
 
         Some(arguments)
+    }
+
+    fn parse_string_literal(&self) -> Option<Expression> {
+        match self.current_token {
+            Token::String(ref value) => Some(Expression::Literal(Literal::String(value.clone()))),
+            _ => None,
+        }
     }
 }
 
@@ -1078,6 +1086,32 @@ mod tests {
                 },
             ],
         });
+
+        let lexer = Lexer::new(input.into());
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse();
+
+        print_parser_errors!(parser.errors());
+
+        match program {
+            Err(_) => {
+                panic!("Parser error");
+            }
+            Ok(program) => {
+                assert_eq!(program.statements.len(), 1);
+                let statement = program.statements.first().unwrap();
+                assert_eq!(statement, &expected);
+            }
+        }
+    }
+
+    #[test]
+    fn string_literal() {
+        let input = "\"hello world\";";
+
+        let expected = Statement::Expression(Expression::Literal(Literal::String(
+            "hello world".to_string(),
+        )));
 
         let lexer = Lexer::new(input.into());
         let mut parser = Parser::new(lexer);
