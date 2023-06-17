@@ -12,6 +12,7 @@ pub enum Object {
     Integer(i64),
     Boolean(bool),
     String(String),
+    Array(Vec<Object>),
     Return(Box<Object>),
     Error(String),
     Function {
@@ -47,6 +48,14 @@ impl Display for Object {
             ),
             Object::String(string) => write!(f, "{}", string),
             Object::Builtin(built_in) => todo!("to_string for built in"),
+            Object::Array(array) => {
+                let elements = array
+                    .iter()
+                    .map(|element| element.to_string())
+                    .collect::<Vec<String>>()
+                    .join(", ");
+                write!(f, "[{}]", elements)
+            }
         }
     }
 }

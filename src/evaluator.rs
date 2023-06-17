@@ -98,12 +98,12 @@ impl Evaluator {
         }
     }
 
-    fn evaluate_literal(&self, literal: Literal) -> Object {
+    fn evaluate_literal(&mut self, literal: Literal) -> Object {
         match literal {
             Literal::Integer(value) => Object::Integer(value),
             Literal::Boolean(value) => self.native_boolean_to_boolean_object(value),
             Literal::String(value) => Object::String(value),
-            Literal::Array(_) => todo!(),
+            Literal::Array(array) => self.evaluate_array_literal(array),
         }
     }
 
@@ -353,6 +353,18 @@ impl Evaluator {
             Infix::Plus => Object::String(format!("{}{}", left, right)),
             _ => self.error(format!("unknown operator: {} {} {}", left, operator, right)),
         }
+    }
+
+    fn evaluate_array_literal(&mut self, array: Vec<Expression>) -> Object {
+        let elements = array
+            .iter()
+            .map(|element| {
+                self.evaluate_expression(element.clone())
+                    .unwrap_or(Object::Null)
+            })
+            .collect::<Vec<_>>();
+
+        Object::Array(elements)
     }
 }
 
@@ -928,6 +940,22 @@ mod tests {
         for test in tests {
             let evaluated = evaluate(test.input);
             assert_eq!(evaluated, Some(test.expected));
+        }
+    }
+
+    #[test]
+    fn evaluate_array_literal() {
+        let input = String::from("[1, 2 * 2, 3 + 3]");
+        let evaluated = evaluate(input);
+
+        match evaluated {
+            Some(Object::Array(elements)) => {
+                assert_eq!(elements.len(), 3);
+                assert_integer_object!(Some(elements[0].clone()), 1);
+                assert_integer_object!(Some(elements[1].clone()), 4);
+                assert_integer_object!(Some(elements[2].clone()), 6);
+            }
+            _ => panic!("object is not Array. got={:?}", evaluated),
         }
     }
 }
