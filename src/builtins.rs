@@ -10,7 +10,7 @@ pub fn new_builtins() -> HashMap<String, Object> {
     builtins.insert("last".to_string(), Object::Builtin(last));
     builtins.insert("rest".to_string(), Object::Builtin(rest));
     builtins.insert("push".to_string(), Object::Builtin(push));
-    builtins.insert("println".to_string(), Object::Builtin(println));
+    builtins.insert("print".to_string(), Object::Builtin(print));
 
     builtins
 }
@@ -105,9 +105,9 @@ fn push(args: Vec<Object>) -> Object {
     }
 }
 
-fn println(args: Vec<Object>) -> Object {
+fn print(args: Vec<Object>) -> Object {
     for arg in args {
         println!("{}", arg);
     }
-    Object::Null
+    Object::Void
 }

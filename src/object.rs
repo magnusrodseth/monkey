@@ -23,6 +23,7 @@ pub enum Object {
     },
     Builtin(BuiltinFunction),
     Null,
+    Void,
 }
 
 impl Display for Object {
@@ -68,6 +69,7 @@ impl Display for Object {
                 }
                 write!(f, "{{{}}}", result)
             }
+            Object::Void => write!(f, ""),
         }
     }
 }
