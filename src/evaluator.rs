@@ -104,7 +104,7 @@ impl Evaluator {
             Literal::Boolean(value) => self.native_boolean_to_boolean_object(value),
             Literal::String(value) => Object::String(value),
             Literal::Array(array) => self.evaluate_array_literal(array),
-            Literal::Hash(hash) => todo!(),
+            Literal::Hash(hash) => self.evaluate_hash_literal(hash),
         }
     }
 
@@ -393,6 +393,26 @@ impl Evaluator {
             }
             _ => NULL,
         }
+    }
+
+    fn evaluate_hash_literal(&mut self, hash: Vec<(Expression, Expression)>) -> Object {
+        let mut pairs = HashMap::new();
+
+        for (key, value) in hash {
+            let key = match self.evaluate_expression(key) {
+                Some(object) => object,
+                _ => return NULL,
+            };
+
+            let value = match self.evaluate_expression(value) {
+                Some(object) => object,
+                _ => return NULL,
+            };
+
+            pairs.insert(key, value);
+        }
+
+        Object::Hash(pairs)
     }
 }
 
@@ -1042,6 +1062,47 @@ mod tests {
         for test in tests {
             let evaluated = evaluate(test.input);
             assert_eq!(evaluated, Some(test.expected));
+        }
+    }
+
+    #[test]
+    fn evaluate_hash_literals() {
+        let input = String::from(
+            r#"
+            let two = "two";
+            {
+                "one": 10 - 9,
+                two: 1 + 1,
+                "thr" + "ee": 6 / 2,
+                4: 4,
+                true: 5,
+                false: 6
+            }
+            "#,
+        );
+
+        let evaluated = evaluate(input);
+
+        let mut expected = HashMap::new();
+        expected.insert(Object::String(String::from("one")), Object::Integer(1));
+        expected.insert(Object::String(String::from("two")), Object::Integer(2));
+        expected.insert(Object::String(String::from("three")), Object::Integer(3));
+        expected.insert(Object::Integer(4), Object::Integer(4));
+        expected.insert(Object::Boolean(true), Object::Integer(5));
+        expected.insert(Object::Boolean(false), Object::Integer(6));
+
+        match evaluated {
+            Some(Object::Hash(pairs)) => {
+                assert_eq!(pairs.len(), expected.len());
+
+                for (expected_key, expected_value) in expected {
+                    match pairs.get(&expected_key) {
+                        Some(value) => assert_eq!(value, &expected_value),
+                        None => panic!("no pair for given key in pairs"),
+                    }
+                }
+            }
+            _ => panic!("evaluated is not Hash. got={:?}", evaluated),
         }
     }
 }
