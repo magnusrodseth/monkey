@@ -820,4 +820,20 @@ mod tests {
             assert_integer_object!(evaluated, test.expected);
         }
     }
+
+    #[test]
+    fn evaluate_closures() {
+        let input = String::from(
+            r#"
+            let newAdder = fn(x) {
+                fn(y) { x + y };
+            };
+
+            let addTwo = newAdder(2);
+            addTwo(2);
+            "#,
+        );
+
+        assert_integer_object!(evaluate(input.clone()), 4);
+    }
 }
