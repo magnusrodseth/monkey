@@ -94,6 +94,7 @@ impl Evaluator {
                 function,
                 arguments,
             } => Some(self.evaluate_call_expression(function, arguments)),
+            Expression::Index { left, index } => todo!(),
         }
     }
 
@@ -102,6 +103,7 @@ impl Evaluator {
             Literal::Integer(value) => Object::Integer(value),
             Literal::Boolean(value) => self.native_boolean_to_boolean_object(value),
             Literal::String(value) => Object::String(value),
+            Literal::Array(_) => todo!(),
         }
     }
 

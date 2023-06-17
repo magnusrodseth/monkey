@@ -61,6 +61,10 @@ impl Display for Infix {
 pub enum Expression {
     Identifier(Identifier),
     Literal(Literal),
+    Index {
+        left: Box<Expression>,
+        index: Box<Expression>,
+    },
     Prefix {
         operator: Prefix,
         right: Box<Expression>,
@@ -93,6 +97,23 @@ impl Display for Expression {
                 Literal::Integer(integer) => write!(f, "{}", integer),
                 Literal::Boolean(boolean) => write!(f, "{}", boolean),
                 Literal::String(string) => write!(f, "{}", string),
+                Literal::Array(array) => {
+                    let mut string = String::new();
+
+                    string.push_str("[");
+
+                    for (index, element) in array.iter().enumerate() {
+                        string.push_str(&element.to_string());
+
+                        if index != array.len() - 1 {
+                            string.push_str(", ");
+                        }
+                    }
+
+                    string.push_str("]");
+
+                    write!(f, "{}", string)
+                }
             },
             Expression::Prefix { operator, right } => write!(f, "({}{})", operator, right),
             Expression::Infix {
@@ -153,15 +174,19 @@ impl Display for Expression {
 
                 write!(f, "{}", string)
             }
+            Expression::Index { left, index } => {
+                write!(f, "({}[{}])", left.to_string(), index.to_string())
+            }
         }
     }
 }
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Literal {
     Integer(i64),
     Boolean(bool),
     String(String),
+    Array(Vec<Expression>),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -218,6 +243,7 @@ pub enum Precedence {
     Product,
     Prefix,
     Call,
+    Index,
 }
 
 impl Display for Program {

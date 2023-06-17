@@ -38,6 +38,8 @@ pub enum Token {
     RightParenthesis,
     LeftBrace,
     RightBrace,
+    LeftBracket,
+    RightBracket,
 
     // Keywords
     Function,
@@ -78,6 +80,8 @@ impl Token {
             Token::LessThanOrEqual => "<=".into(),
             Token::GreaterThanOrEqual => ">=".into(),
             Token::String(string) => format!("{}", string),
+            Token::LeftBracket => "[".into(),
+            Token::RightBracket => "]".into(),
         }
     }
 }
@@ -115,6 +119,8 @@ impl Display for Token {
             Token::LessThanOrEqual => write!(f, "LessThanOrEqual"),
             Token::GreaterThanOrEqual => write!(f, "GreaterThanOrEqual"),
             Token::String(string) => write!(f, "{}", string),
+            Token::LeftBracket => write!(f, "LeftBracket"),
+            Token::RightBracket => write!(f, "RightBracket"),
         }
     }
 }

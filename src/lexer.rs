@@ -76,6 +76,8 @@ impl Lexer {
             '>' => self.handle_peek('=', Token::GreaterThanOrEqual, Token::GreaterThan),
             '{' => Token::LeftBrace,
             '}' => Token::RightBrace,
+            '[' => Token::LeftBracket,
+            ']' => Token::RightBracket,
             EOF => Token::EOF,
             '"' => {
                 let string = self.read_string();
@@ -225,6 +227,8 @@ mod tests {
             let result = add(five, ten);
             \"foobar\"
             \"foo bar\"
+
+            [1, 2];
         ";
 
         let expected = vec![
@@ -266,6 +270,12 @@ mod tests {
             Token::Semicolon,
             Token::String(String::from("foobar")),
             Token::String(String::from("foo bar")),
+            Token::LeftBracket,
+            Token::Integer(1),
+            Token::Comma,
+            Token::Integer(2),
+            Token::RightBracket,
+            Token::Semicolon,
         ];
 
         assert_lexer_eq!(input, expected);

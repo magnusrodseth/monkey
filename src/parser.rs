@@ -61,6 +61,7 @@ impl Parser {
             Token::Plus | Token::Minus => Precedence::Sum,
             Token::Slash | Token::Asterisk => Precedence::Product,
             Token::LeftParenthesis => Precedence::Call,
+            Token::LeftBracket => Precedence::Index,
             _ => Precedence::Lowest,
         }
     }
@@ -232,6 +233,7 @@ impl Parser {
             Token::Integer(_) => self.parse_integer_literal(),
             Token::String(_) => self.parse_string_literal(),
             Token::Boolean(_) => self.parse_boolean(),
+            Token::LeftBracket => self.parse_array_literal(),
             Token::Bang | Token::Minus | Token::Plus => self.parse_prefix(),
             Token::LeftParenthesis => self.parse_grouped_expression(),
             Token::If => self.parse_if_expression(),
@@ -267,6 +269,10 @@ impl Parser {
                 Token::LeftParenthesis => {
                     self.next_token();
                     left = self.parse_call_expression(left.expect("Expected left expression"));
+                }
+                Token::LeftBracket => {
+                    self.next_token();
+                    left = self.parse_index_expression(left.expect("Expected left expression"));
                 }
                 _ => return left,
             }
@@ -459,7 +465,7 @@ impl Parser {
     }
 
     fn parse_call_expression(&mut self, function: Expression) -> Option<Expression> {
-        let arguments = match self.parse_call_arguments() {
+        let arguments = match self.parse_expression_list(Token::RightParenthesis) {
             Some(arguments) => arguments,
             None => return None,
         };
@@ -470,43 +476,70 @@ impl Parser {
         })
     }
 
-    fn parse_call_arguments(&mut self) -> Option<Vec<Expression>> {
-        let mut arguments = Vec::new();
+    fn parse_string_literal(&self) -> Option<Expression> {
+        match self.current_token {
+            Token::String(ref value) => Some(Expression::Literal(Literal::String(value.clone()))),
+            _ => None,
+        }
+    }
 
-        if self.peek_token_is(&Token::RightParenthesis) {
+    fn parse_array_literal(&mut self) -> Option<Expression> {
+        let elements = match self.parse_expression_list(Token::RightBracket) {
+            Some(elements) => elements,
+            None => return None,
+        };
+
+        Some(Expression::Literal(Literal::Array(elements)))
+    }
+
+    fn parse_expression_list(&mut self, end: Token) -> Option<Vec<Expression>> {
+        let mut elements = Vec::new();
+
+        if self.peek_token_is(&end) {
             self.next_token();
-            return None;
+            return Some(elements);
         }
 
         self.next_token();
 
         match self.parse_expression(Precedence::Lowest) {
-            Some(expression) => arguments.push(expression),
+            Some(element) => elements.push(element),
             None => return None,
-        };
+        }
 
         while self.peek_token_is(&Token::Comma) {
             self.next_token();
             self.next_token();
 
             match self.parse_expression(Precedence::Lowest) {
-                Some(expression) => arguments.push(expression),
+                Some(element) => elements.push(element),
                 None => return None,
-            };
+            }
         }
 
-        if !self.peek_and_expect(Token::RightParenthesis) {
+        if !self.peek_and_expect(end) {
             return None;
         }
 
-        Some(arguments)
+        Some(elements)
     }
 
-    fn parse_string_literal(&self) -> Option<Expression> {
-        match self.current_token {
-            Token::String(ref value) => Some(Expression::Literal(Literal::String(value.clone()))),
-            _ => None,
+    fn parse_index_expression(&mut self, expect: Expression) -> Option<Expression> {
+        self.next_token();
+
+        let index = match self.parse_expression(Precedence::Lowest) {
+            Some(index) => index,
+            None => return None,
+        };
+
+        if !self.peek_and_expect(Token::RightBracket) {
+            return None;
         }
+
+        Some(Expression::Index {
+            left: Box::new(expect),
+            index: Box::new(index),
+        })
     }
 }
 
@@ -885,6 +918,14 @@ mod tests {
                 input: "add(a + b + c * d / f + g)",
                 expected: "add((((a + b) + ((c * d) / f)) + g))",
             },
+            OperatorPrecedenceTest {
+                input: "a * [1, 2, 3, 4][b * c] * d",
+                expected: "((a * ([1, 2, 3, 4][(b * c)])) * d)",
+            },
+            OperatorPrecedenceTest {
+                input: "add(a * b[2], b[1], 2 * [1, 2][1])",
+                expected: "add((a * (b[2])), (b[1]), (2 * ([1, 2][1])))",
+            },
         ];
 
         for test in expected {
@@ -1127,6 +1168,77 @@ mod tests {
                 assert_eq!(program.statements.len(), 1);
                 let statement = program.statements.first().unwrap();
                 assert_eq!(statement, &expected);
+            }
+        }
+    }
+
+    #[test]
+    fn parse_array_literal() {
+        let input = "[1, 2 * 2, 3 + 3]";
+
+        let lexer = Lexer::new(input.into());
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse();
+
+        print_parser_errors!(parser.errors());
+
+        match program {
+            Err(_) => {
+                panic!("Parser error");
+            }
+            Ok(program) => {
+                assert_eq!(program.statements.len(), 1);
+                let statement = program.statements.first().unwrap();
+
+                assert_eq!(
+                    Statement::Expression(Expression::Literal(Literal::Array(vec![
+                        Expression::Literal(Literal::Integer(1)),
+                        Expression::Infix {
+                            left: Box::new(Expression::Literal(Literal::Integer(2))),
+                            operator: Infix::Multiply,
+                            right: Box::new(Expression::Literal(Literal::Integer(2))),
+                        },
+                        Expression::Infix {
+                            left: Box::new(Expression::Literal(Literal::Integer(3))),
+                            operator: Infix::Plus,
+                            right: Box::new(Expression::Literal(Literal::Integer(3))),
+                        },
+                    ]))),
+                    *statement
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn parse_index_operator() {
+        let input = "myArray[1 + 1]";
+
+        let lexer = Lexer::new(input.into());
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse();
+
+        print_parser_errors!(parser.errors());
+
+        match program {
+            Err(_) => {
+                panic!("Parser error");
+            }
+            Ok(program) => {
+                assert_eq!(program.statements.len(), 1);
+                let statement = program.statements.first().unwrap();
+
+                assert_eq!(
+                    Statement::Expression(Expression::Index {
+                        left: Box::new(Expression::Identifier(Identifier("myArray".to_string()))),
+                        index: Box::new(Expression::Infix {
+                            left: Box::new(Expression::Literal(Literal::Integer(1))),
+                            operator: Infix::Plus,
+                            right: Box::new(Expression::Literal(Literal::Integer(1))),
+                        }),
+                    }),
+                    *statement
+                );
             }
         }
     }
