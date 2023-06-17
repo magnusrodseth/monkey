@@ -239,6 +239,7 @@ impl Parser {
             Token::LeftParenthesis => self.parse_grouped_expression(),
             Token::If => self.parse_if_expression(),
             Token::Function => self.parse_function_literal(),
+            Token::While => self.parse_while_expression(),
             Token::LeftBrace => self.parse_hash_literal(),
             _ => {
                 self.errors.push(ParserError::new(
@@ -578,6 +579,31 @@ impl Parser {
         }
 
         Some(Expression::Literal(Literal::Hash(pairs)))
+    }
+
+    fn parse_while_expression(&mut self) -> Option<Expression> {
+        dbg!(&self.current_token);
+        dbg!(&self.peek_token);
+
+        if !self.peek_and_expect(Token::LeftParenthesis) {
+            return None;
+        }
+
+        let condition = match self.parse_expression(Precedence::Lowest) {
+            Some(condition) => condition,
+            None => return None,
+        };
+
+        if !self.peek_and_expect(Token::LeftBrace) {
+            return None;
+        }
+
+        let body = self.parse_block_statement();
+
+        Some(Expression::While {
+            condition: Box::new(condition),
+            consequence: body,
+        })
     }
 }
 
@@ -1360,6 +1386,51 @@ mod tests {
                         Statement::Expression(Expression::Literal(Literal::Hash(test.expected))),
                         *statement
                     );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn parse_while() {
+        struct Test {
+            input: &'static str,
+            expected: Expression,
+        }
+
+        let tests = vec![Test {
+            input: "while (x < 10) { let y = 2; }",
+            expected: Expression::While {
+                condition: Box::new(Expression::Infix {
+                    left: Box::new(Expression::Identifier(Identifier("x".to_string()))),
+                    operator: Infix::LessThan,
+                    right: Box::new(Expression::Literal(Literal::Integer(10))),
+                }),
+                consequence: BlockStatement {
+                    statements: vec![Statement::Let {
+                        identifier: Identifier("y".to_string()),
+                        value: Expression::Literal(Literal::Integer(2)),
+                    }],
+                },
+            },
+        }];
+
+        for test in tests {
+            let lexer = Lexer::new(test.input.into());
+            let mut parser = Parser::new(lexer);
+            let program = parser.parse();
+
+            print_parser_errors!(parser.errors());
+
+            match program {
+                Err(_) => {
+                    panic!("Parser error");
+                }
+                Ok(program) => {
+                    assert_eq!(program.statements.len(), 1);
+                    let statement = program.statements.first().unwrap();
+
+                    assert_eq!(Statement::Expression(test.expected), *statement);
                 }
             }
         }

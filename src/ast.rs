@@ -79,11 +79,9 @@ pub enum Expression {
         consequence: BlockStatement,
         alternative: Option<BlockStatement>,
     },
-    For {
-        let_statement: Box<Statement>,
+    While {
         condition: Box<Expression>,
-        update: Box<Expression>,
-        body: BlockStatement,
+        consequence: BlockStatement,
     },
     Assign {
         name: Identifier,
@@ -206,23 +204,14 @@ impl Display for Expression {
             Expression::Index { left, index } => {
                 write!(f, "({}[{}])", left.to_string(), index.to_string())
             }
-            Expression::For {
-                let_statement,
-                condition,
-                update,
-                body,
-            } => {
-                write!(
-                    f,
-                    "for ({}; {}; {}) {}",
-                    let_statement.to_string(),
-                    condition.to_string(),
-                    update.to_string(),
-                    body.to_string()
-                )
-            }
             Expression::Assign { name, value } => {
                 write!(f, "{} = {}", name.0, value.to_string())
+            }
+            Expression::While {
+                condition,
+                consequence,
+            } => {
+                write!(f, "while ({}) {}", condition, consequence)
             }
         }
     }

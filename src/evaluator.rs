@@ -95,13 +95,11 @@ impl Evaluator {
                 arguments,
             } => Some(self.evaluate_call_expression(function, arguments)),
             Expression::Index { left, index } => Some(self.evaluate_index_expression(left, index)),
-            Expression::For {
-                let_statement,
-                condition,
-                update,
-                body,
-            } => todo!(),
             Expression::Assign { name, value } => todo!(),
+            Expression::While {
+                condition,
+                consequence,
+            } => todo!(),
         }
     }
 
@@ -501,7 +499,6 @@ mod tests {
                 input: String::from("5"),
                 expected: 5,
             },
-            // Prefix operator
             Test {
                 input: String::from("-5"),
                 expected: -5,
@@ -514,7 +511,6 @@ mod tests {
                 input: String::from("-50"),
                 expected: -50,
             },
-            // Infix operator
             Test {
                 input: String::from("5 + 5 + 5 + 5 - 10"),
                 expected: 10,
