@@ -49,19 +49,25 @@ This task of parsing was much larger than the lexical analysis, and much more ch
 I learnt a lot about traits in Rust, especially when defining the abstract syntax tree. Traits in Rust are equivalent to interfaces in other languages. They allow us to define a set of methods that a type must implement. The only reason nodes in the AST need to implement `as_any()` is because we need to downcast them in the parser tests. Below follows an overview of the type of nodes in the AST:
 
 - **Statements**
-  - `LetStatement`
-  - `ReturnStatement`
+  - `Let`
+  - `Return`
   - `ExpressionStatement`, which is just a wrapper around an `Expression`
   - `BlockStatement`
+  - `Empty`
 - **Expressions**
   - `Identifier`
-  - `IntegerLiteral`
-  - `PrefixExpression`
-  - `InfixExpression`
+  - `Literal`
+    - `Integer`
+    - `String`
+    - `Boolean`
+  - `Prefix`
+    - `+`, `-`, `!`
+  - `Infix`
+    - `+`, `-`, `*`, `/`, `==`, `!=`, `<`, `>`, `<=`, `>=`
   - `Boolean`
-  - `IfExpression`
-  - `FunctionLiteral`
-  - `CallExpression`
+  - `If`
+  - `Function`
+  - `Call`
 
 #### The parser
 
@@ -72,6 +78,18 @@ I wrote extensive tests for the parser, which was very helpful. I also created s
 #### Extending the REPL
 
 After fully implementing the parser for the abstract syntax tree, I extended the REPL to now display the parsed AST. Earlier, only the lexical information was displayed back to the user when interacting with the REPL. Now, the parsed AST is displayed back to the user. This is a huge step forward.
+
+### Chapter 3 - Evaluation
+
+Evaluation focuses on evaluating the AST, and producing a result. The evaluator is defined in [`src/evaluator.rs`](/src/evaluator.rs). **This is where code becomes meaningful**. Other relevant files for this section is the [`environment.rs`](/src/environment.rs), which is responsible for keeping track of variable scopes, and [`object.rs`](/src/object.rs), which defines the `Object` enum. The `Object` enum is used to represent the result of evaluating an expression. It's a very simple enum, with variants for `Integer`, `Boolean`, `Null`, `ReturnValue`, `Error`, `Function`, and `Null`.
+
+#### Representing objects
+
+The `Object` enum is used to represent the result of evaluating an expression. It's a very simple enum, with variants for `Integer`, `Boolean`, `Null`, `ReturnValue`, `Error`, `Function`, and `Null`. It is defined in [`src/object.rs`](/src/object.rs), and used in the [`evaluator.rs`](/src/evaluator.rs).
+
+#### Managing variable scopes
+
+The `Environment` struct is responsible for keeping track of variable scopes. It's defined in [`src/environment.rs`](/src/environment.rs). In Monkey, functions and closures are higher order functions, which means they can capture variables from the surrounding environment. This is implemented (in practise) using a linked list of variable scopes; each scope has a pointer to the outer scope. When a variable is looked up, the current scope is searched first, then the outer scope, and so on. In short, **the outer scope encloses the inner scope, and the inner scope extends the outer scope**.
 
 ---
 
