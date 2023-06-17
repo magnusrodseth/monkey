@@ -391,6 +391,16 @@ impl Evaluator {
 
                 elements[index as usize].clone()
             }
+            (Object::Hash(pairs), index) => match index {
+                Object::String(_) | Object::Integer(_) | Object::Boolean(_) => {
+                    match pairs.get(&index) {
+                        Some(object) => object.clone(),
+                        _ => NULL,
+                    }
+                }
+                Object::Error(_) => index,
+                _ => self.error(format!("unusable as hash key: {}", index)),
+            },
             _ => NULL,
         }
     }
@@ -828,6 +838,14 @@ mod tests {
                 input: String::from(r#""Hello" - "World""#),
                 expected: String::from("unknown operator: Hello - World"),
             },
+            Test {
+                input: String::from(r#""Hello" - 1"#),
+                expected: String::from("type mismatch: Hello - 1"),
+            },
+            Test {
+                input: String::from(r#"{"name": "Monkey"}[fn(x) { x }];"#),
+                expected: String::from("unusable as hash key: fn(x) {\nx\n}"),
+            },
         ];
 
         for test in tests {
@@ -1103,6 +1121,50 @@ mod tests {
                 }
             }
             _ => panic!("evaluated is not Hash. got={:?}", evaluated),
+        }
+    }
+
+    #[test]
+    fn evaluate_hash_index_expressions() {
+        struct Test {
+            input: String,
+            expected: Object,
+        }
+
+        let tests = vec![
+            Test {
+                input: String::from(r#"{"foo": 5}["foo"]"#),
+                expected: Object::Integer(5),
+            },
+            Test {
+                input: String::from(r#"{"foo": 5}["bar"]"#),
+                expected: Object::Null,
+            },
+            Test {
+                input: String::from(r#"let key = "foo"; {"foo": 5}[key]"#),
+                expected: Object::Integer(5),
+            },
+            Test {
+                input: String::from(r#"{}["foo"]"#),
+                expected: Object::Null,
+            },
+            Test {
+                input: String::from(r#"{5: 5}[5]"#),
+                expected: Object::Integer(5),
+            },
+            Test {
+                input: String::from(r#"{true: 5}[true]"#),
+                expected: Object::Integer(5),
+            },
+            Test {
+                input: String::from(r#"{false: 5}[false]"#),
+                expected: Object::Integer(5),
+            },
+        ];
+
+        for test in tests {
+            let evaluated = evaluate(test.input);
+            assert_eq!(evaluated, Some(test.expected));
         }
     }
 }
