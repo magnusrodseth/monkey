@@ -89,7 +89,6 @@ impl Evaluator {
                 function,
                 arguments,
             } => Some(self.evaluate_call_expression(function, arguments)),
-            _ => None,
         }
     }
 
@@ -98,7 +97,6 @@ impl Evaluator {
             Literal::Integer(value) => Object::Integer(value),
             Literal::Boolean(value) => self.native_boolean_to_boolean_object(value),
             Literal::String(value) => Object::String(value),
-            _ => NULL,
         }
     }
 
@@ -169,6 +167,15 @@ impl Evaluator {
                     self.error(format!("type mismatch: {} {} {}", left, operator, right,))
                 }
             }
+
+            Object::String(ref left_value) => {
+                if let Object::String(right_value) = right {
+                    self.evaluate_string_infix_expression(operator, left_value, &right_value)
+                } else {
+                    self.error(format!("type mismatch: {} {} {}", left, operator, right,))
+                }
+            }
+
             _ => self.error(format!("unknown operator: {} {} {}", left, operator, right,)),
         }
     }
@@ -320,6 +327,18 @@ impl Evaluator {
         match body {
             Some(object) => object,
             _ => Object::Null,
+        }
+    }
+
+    fn evaluate_string_infix_expression(
+        &self,
+        operator: Infix,
+        left: &String,
+        right: &String,
+    ) -> Object {
+        match operator {
+            Infix::Plus => Object::String(format!("{}{}", left, right)),
+            _ => self.error(format!("unknown operator: {} {} {}", left, operator, right)),
         }
     }
 }
@@ -732,6 +751,10 @@ mod tests {
                 input: String::from("foobar"),
                 expected: String::from("identifier not found: foobar"),
             },
+            Test {
+                input: String::from(r#""Hello" - "World""#),
+                expected: String::from("unknown operator: Hello - World"),
+            },
         ];
 
         for test in tests {
@@ -850,6 +873,12 @@ mod tests {
     #[test]
     fn evaluate_string() {
         let input = String::from(r#""Hello World!""#);
+        assert_string_object!(evaluate(input.clone()), "Hello World!");
+    }
+
+    #[test]
+    fn evaluate_string_concatenation() {
+        let input = String::from(r#""Hello" + " " + "World!""#);
         assert_string_object!(evaluate(input.clone()), "Hello World!");
     }
 }
