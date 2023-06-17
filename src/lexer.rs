@@ -134,6 +134,7 @@ impl Lexer {
             "if" => Token::If,
             "else" => Token::Else,
             "return" => Token::Return,
+            "for" => Token::For,
             _ => Token::Identifier(identifier),
         }
     }
@@ -375,6 +376,40 @@ mod tests {
             Token::Assign,
             Token::Integer(5),
             Token::Semicolon,
+        ];
+
+        assert_lexer_eq!(input, expected);
+    }
+
+    #[test]
+    fn for_loop() {
+        let input = r#"
+            for (let i = 0; i < 10; i = i + 1) {
+                i;
+            }"#;
+
+        let expected = vec![
+            Token::For,
+            Token::LeftParenthesis,
+            Token::Let,
+            Token::Identifier(String::from("i")),
+            Token::Assign,
+            Token::Integer(0),
+            Token::Semicolon,
+            Token::Identifier(String::from("i")),
+            Token::LessThan,
+            Token::Integer(10),
+            Token::Semicolon,
+            Token::Identifier(String::from("i")),
+            Token::Assign,
+            Token::Identifier(String::from("i")),
+            Token::Plus,
+            Token::Integer(1),
+            Token::RightParenthesis,
+            Token::LeftBrace,
+            Token::Identifier(String::from("i")),
+            Token::Semicolon,
+            Token::RightBrace,
         ];
 
         assert_lexer_eq!(input, expected);

@@ -114,3 +114,4 @@ In order to add a new built-in function, you simply add its entry in the `HashMa
 - [ ] Flesh out the `Error` in the parser to contain more information about what kind of error occurred. That way, the user gets a much better compile time error.
 - [ ] Print colored and nice output to terminal when using the REPL. Thinking especially of the error messages.
 - [ ] Add `Option` (`Some`, `None`) and `Result` (`Ok`, `Err`) to the language
+- [ ] add for loop and while loop
