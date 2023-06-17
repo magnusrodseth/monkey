@@ -115,3 +115,4 @@ In order to add a new built-in function, you simply add its entry in the `HashMa
 - [ ] Remove uneccessary empty method in the AST for `Expression`, `Statement`, etc.
 - [ ] Print colored and nice output to terminal when using the REPL. Thinking especially of the error messages.
 - [ ] Add `Option` (`Some`, `None`) and `Result` (`Ok`, `Err`) to the language
+- [ ] Take source code as `stdin`.
