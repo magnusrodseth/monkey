@@ -2,7 +2,7 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::{
     ast::{BlockStatement, Expression, Identifier, Infix, Literal, Prefix, Program, Statement},
-    builtin::new_builtins,
+    builtins::new_builtins,
     environment::Environment,
     object::Object,
 };

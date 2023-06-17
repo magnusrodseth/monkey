@@ -1,7 +1,7 @@
 use repl::Repl;
 
 mod ast;
-mod builtin;
+mod builtins;
 mod environment;
 mod evaluator;
 mod lexer;
