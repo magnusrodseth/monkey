@@ -85,6 +85,10 @@ impl Evaluator {
             Expression::Function { parameters, body } => {
                 Some(self.evaluate_function(parameters, body))
             }
+            Expression::Call {
+                function,
+                arguments,
+            } => Some(self.evaluate_call_expression(function, arguments)),
             _ => None,
         }
     }
@@ -253,7 +257,7 @@ impl Evaluator {
 
     fn evaluate_identifier(&self, identifier: Identifier) -> Object {
         let Identifier(identifier) = identifier;
-        match self.environment.borrow_mut().get(&identifier) {
+        match self.environment.borrow_mut().get(identifier.clone()) {
             Some(value) => value.clone(),
             None => Object::Error(format!("identifier not found: {}", identifier)),
         }
@@ -264,6 +268,57 @@ impl Evaluator {
             parameters,
             body,
             environment: Rc::clone(&self.environment),
+        }
+    }
+
+    fn evaluate_call_expression(
+        &mut self,
+        function: Box<Expression>,
+        arguments: Vec<Expression>,
+    ) -> Object {
+        let arguments = arguments
+            .iter()
+            .map(|arg| {
+                self.evaluate_expression(arg.clone())
+                    .unwrap_or(Object::Null)
+            })
+            .collect::<Vec<_>>();
+
+        let (parameters, body, environment) = match self.evaluate_expression(*function) {
+            Some(Object::Function {
+                parameters,
+                body,
+                environment,
+            }) => (parameters, body, environment),
+            Some(object) => return self.error(format!("not a function: {}", object)),
+            None => return NULL,
+        };
+
+        if parameters.len() != arguments.len() {
+            return self.error(format!(
+                "wrong number of arguments: want={}, got={}",
+                parameters.len(),
+                arguments.len()
+            ));
+        }
+
+        let current_environment = Rc::clone(&self.environment);
+        let mut function_environment = Environment::new_enclosed(environment);
+
+        for (identifier, object) in parameters.iter().zip(arguments.iter()) {
+            let Identifier(identifier) = identifier;
+            function_environment.set(identifier.clone(), object.clone());
+        }
+
+        self.environment = Rc::new(RefCell::new(function_environment));
+
+        let body = self.evaluate_block_statement(body);
+
+        self.environment = current_environment;
+
+        match body {
+            Some(object) => object,
+            _ => Object::Null,
         }
     }
 }
@@ -723,6 +778,46 @@ mod tests {
                 assert_eq!(body.to_string(), "(x + 2)");
             }
             _ => panic!("object is not Function. got={:?}", evaluated),
+        }
+    }
+
+    #[test]
+    fn evaluate_function_application() {
+        struct Test {
+            input: String,
+            expected: i64,
+        }
+
+        let tests = vec![
+            Test {
+                input: String::from("let identity = fn(x) { x; }; identity(5);"),
+                expected: 5,
+            },
+            Test {
+                input: String::from("let identity = fn(x) { return x; }; identity(5);"),
+                expected: 5,
+            },
+            Test {
+                input: String::from("let double = fn(x) { x * 2; }; double(5);"),
+                expected: 10,
+            },
+            Test {
+                input: String::from("let add = fn(x, y) { x + y; }; add(5, 5);"),
+                expected: 10,
+            },
+            Test {
+                input: String::from("let add = fn(x, y) { x + y; }; add(5 + 5, add(5, 5));"),
+                expected: 20,
+            },
+            Test {
+                input: String::from("fn(x) { x; }(5)"),
+                expected: 5,
+            },
+        ];
+
+        for test in tests {
+            let evaluated = evaluate(test.input);
+            assert_integer_object!(evaluated, test.expected);
         }
     }
 }
