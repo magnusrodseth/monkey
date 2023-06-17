@@ -91,9 +91,20 @@ The `Object` enum is used to represent the result of evaluating an expression. I
 
 The `Environment` struct is responsible for keeping track of variable scopes. It's defined in [`src/environment.rs`](/src/environment.rs). In Monkey, functions and closures are higher order functions, which means they can capture variables from the surrounding environment. This is implemented (in practise) using a linked list of variable scopes; each scope has a pointer to the outer scope. When a variable is looked up, the current scope is searched first, then the outer scope, and so on. In short, **the outer scope encloses the inner scope, and the inner scope extends the outer scope**.
 
----
+### Chapter 4 - Extending the interpreter
 
-> TODO: Jot down some notes for each completed chapter.
+This chapter focused on extending the interpreter with more familiar concepts found in other programming languages. This included adding:
+
+- **Strings**. This includes string concatenation.
+- **Built-in functions**. This includes `len`, `first`, `last`, `rest`, `push` and `println`.
+- **Arrays**. This includes array literals, and array indexing.
+- **Hashes**. This includes hash literals, and hash indexing.
+
+This part was generally straight forward, but I was impressed with how easy it is to extend the built-in functions.
+
+#### Built-in functions
+
+In order to add a new built-in function, you simply add its entry in the `HashMap` defined in [`src/builtins.rs`](/src/builtins.rs). The key is the name of the function, and the value is a function pointer to the function. The function pointer is defined in the same file, just below. This is simply Rust code that calls the evaluator with the correct arguments. The evaluator then evaluates the arguments, and returns the result.
 
 ## 💡 Future ideas
 
