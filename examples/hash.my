@@ -1,0 +1,7 @@
+let hash = {"name": "John", "age": 20, "band": "Pink Floyd"};
+print("We have the following hash: ", hash);
+
+print("We can access the hash values by using the key:");
+print("Name: ", hash["name"]);
+print("Age: ", hash["age"]);
+print("Band: ", hash["band"]);

@@ -112,6 +112,5 @@ In order to add a new built-in function, you simply add its entry in the `HashMa
 - [ ] Don't treat all integers as `i64`. Based on size, allocate only the type needed.
 - [ ] Support floating point numbers.
 - [ ] Flesh out the `Error` in the parser to contain more information about what kind of error occurred. That way, the user gets a much better compile time error.
-- [ ] Remove uneccessary empty method in the AST for `Expression`, `Statement`, etc.
 - [ ] Print colored and nice output to terminal when using the REPL. Thinking especially of the error messages.
 - [ ] Add `Option` (`Some`, `None`) and `Result` (`Ok`, `Err`) to the language
