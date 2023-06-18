@@ -95,6 +95,13 @@ impl Evaluator {
                 arguments,
             } => Some(self.evaluate_call_expression(function, arguments)),
             Expression::Index { left, index } => Some(self.evaluate_index_expression(left, index)),
+            Expression::Assign {
+                identifier: left,
+                value: right,
+            } => Some(self.evaluate_assign_expression(left, right)),
+            Expression::IndexAssign { left, index, value } => {
+                Some(self.evaluate_index_assign_expression(left, index, value))
+            }
         }
     }
 
@@ -423,6 +430,66 @@ impl Evaluator {
         }
 
         Object::Hash(pairs)
+    }
+
+    fn evaluate_assign_expression(&mut self, left: Identifier, right: Box<Expression>) -> Object {
+        let left = match left {
+            Identifier(identifier) => identifier,
+            _ => return self.error("invalid left-hand side of assignment".to_string()),
+        };
+
+        let value = match self.evaluate_expression(*right) {
+            Some(object) => object,
+            _ => return NULL,
+        };
+
+        self.environment.borrow_mut().set(left, value.clone());
+
+        value
+    }
+
+    fn evaluate_index_assign_expression(
+        &mut self,
+        left: Box<Expression>,
+        index: Box<Expression>,
+        value: Box<Expression>,
+    ) -> Object {
+        let left = match self.evaluate_expression(*left) {
+            Some(object) => object,
+            _ => return NULL,
+        };
+
+        let index = match self.evaluate_expression(*index) {
+            Some(object) => object,
+            _ => return NULL,
+        };
+
+        let value = match self.evaluate_expression(*value) {
+            Some(object) => object,
+            _ => return NULL,
+        };
+
+        match (left, index) {
+            (Object::Array(mut elements), Object::Integer(index)) => {
+                if index < 0 || index >= elements.len() as i64 {
+                    return NULL;
+                }
+
+                elements[index as usize] = value.clone();
+
+                value
+            }
+            (Object::Hash(mut pairs), index) => match index {
+                Object::String(_) | Object::Integer(_) | Object::Boolean(_) => {
+                    pairs.insert(index, value.clone());
+
+                    value
+                }
+                Object::Error(_) => index,
+                _ => self.error(format!("unusable as hash key: {}", index)),
+            },
+            _ => NULL,
+        }
     }
 }
 
@@ -1159,6 +1226,34 @@ mod tests {
             Test {
                 input: String::from(r#"{false: 5}[false]"#),
                 expected: Object::Integer(5),
+            },
+        ];
+
+        for test in tests {
+            let evaluated = evaluate(test.input);
+            assert_eq!(evaluated, Some(test.expected));
+        }
+    }
+
+    #[test]
+    fn evaluate_assignment_expression() {
+        struct Test {
+            input: String,
+            expected: Object,
+        }
+
+        let tests = vec![
+            Test {
+                input: String::from("let a = 5; a = 10; a;"),
+                expected: Object::Integer(10),
+            },
+            Test {
+                input: String::from("let a = 5; let b = a; b;"),
+                expected: Object::Integer(5),
+            },
+            Test {
+                input: String::from("let a = 5; let b = a; let c = a + b + 5; c;"),
+                expected: Object::Integer(15),
             },
         ];
 

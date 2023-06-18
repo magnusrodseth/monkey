@@ -62,6 +62,7 @@ impl Parser {
             Token::Slash | Token::Asterisk => Precedence::Product,
             Token::LeftParenthesis => Precedence::Call,
             Token::LeftBracket => Precedence::Index,
+            Token::Assign => Precedence::Assign,
             _ => Precedence::Lowest,
         }
     }
@@ -274,6 +275,10 @@ impl Parser {
                 Token::LeftBracket => {
                     self.next_token();
                     left = self.parse_index_expression(left.expect("Expected left expression"));
+                }
+                Token::Assign => {
+                    self.next_token();
+                    left = self.parse_assign_expression(left.expect("Expected left expression"));
                 }
                 _ => return left,
             }
@@ -577,6 +582,28 @@ impl Parser {
         }
 
         Some(Expression::Literal(Literal::Hash(pairs)))
+    }
+
+    fn parse_assign_expression(&mut self, expression: Expression) -> Option<Expression> {
+        self.next_token();
+
+        let value = match self.parse_expression(Precedence::Lowest) {
+            Some(value) => value,
+            None => return None,
+        };
+
+        match expression {
+            Expression::Identifier(identifier) => Some(Expression::Assign {
+                identifier,
+                value: Box::new(value),
+            }),
+            Expression::Index { left, index } => Some(Expression::IndexAssign {
+                left,
+                index,
+                value: Box::new(value),
+            }),
+            _ => None,
+        }
     }
 }
 
@@ -1359,6 +1386,73 @@ mod tests {
                         Statement::Expression(Expression::Literal(Literal::Hash(test.expected))),
                         *statement
                     );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn parse_assign_expression() {
+        struct Test {
+            input: &'static str,
+            expected: Statement,
+        }
+
+        let tests = vec![
+            Test {
+                input: "x = 5;",
+                expected: Statement::Expression(Expression::Assign {
+                    identifier: Identifier("x".to_string()),
+                    value: Box::new(Expression::Literal(Literal::Integer(5))),
+                }),
+            },
+            Test {
+                input: "x = 5 + 5;",
+                expected: Statement::Expression(Expression::Assign {
+                    identifier: Identifier("x".to_string()),
+                    value: Box::new(Expression::Infix {
+                        left: Box::new(Expression::Literal(Literal::Integer(5))),
+                        operator: Infix::Plus,
+                        right: Box::new(Expression::Literal(Literal::Integer(5))),
+                    }),
+                }),
+            },
+            Test {
+                input: "x = 5 - 5;",
+                expected: Statement::Expression(Expression::Assign {
+                    identifier: Identifier("x".to_string()),
+                    value: Box::new(Expression::Infix {
+                        left: Box::new(Expression::Literal(Literal::Integer(5))),
+                        operator: Infix::Minus,
+                        right: Box::new(Expression::Literal(Literal::Integer(5))),
+                    }),
+                }),
+            },
+            Test {
+                input: "x = y;",
+                expected: Statement::Expression(Expression::Assign {
+                    identifier: Identifier("x".to_string()),
+                    value: Box::new(Expression::Identifier(Identifier("y".to_string()))),
+                }),
+            },
+        ];
+
+        for test in tests {
+            let lexer = Lexer::new(test.input.into());
+            let mut parser = Parser::new(lexer);
+            let program = parser.parse();
+
+            print_parser_errors!(parser.errors());
+
+            match program {
+                Err(_) => {
+                    panic!("Parser error");
+                }
+                Ok(program) => {
+                    assert_eq!(program.statements.len(), 1);
+                    let statement = program.statements.first().unwrap();
+
+                    assert_eq!(test.expected, *statement);
                 }
             }
         }
