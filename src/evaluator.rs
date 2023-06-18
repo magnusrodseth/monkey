@@ -503,7 +503,7 @@ impl Evaluator {
     ) -> Option<Object> {
         let mut result = None;
 
-        while let Some(condition) = self.evaluate_expression(*condition) {
+        while let Some(condition) = self.evaluate_expression(*condition.clone()) {
             if self.is_truthy(&condition) {
                 result = self.evaluate_block_statement(consequence.clone());
             } else {

@@ -1533,16 +1533,14 @@ mod tests {
                         right: Box::new(Expression::Literal(Literal::Integer(10))),
                     }),
                     consequence: BlockStatement {
-                        statements: vec![
-                            Statement::Expression(Expression::Identifier(Identifier(
-                                "y".to_string(),
-                            ))),
-                            Statement::Expression(Expression::Infix {
+                        statements: vec![Statement::Expression(Expression::Assign {
+                            identifier: Identifier("y".to_string()),
+                            value: Box::new(Expression::Infix {
                                 left: Box::new(Expression::Identifier(Identifier("y".to_string()))),
                                 operator: Infix::Plus,
                                 right: Box::new(Expression::Literal(Literal::Integer(1))),
                             }),
-                        ],
+                        })],
                     },
                 },
             },
