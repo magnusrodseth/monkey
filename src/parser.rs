@@ -1525,6 +1525,25 @@ mod tests {
                 },
             },
             Test {
+                input: "while (x < 10) { let y = 2; continue; }",
+                expected: Expression::While {
+                    condition: Box::new(Expression::Infix {
+                        left: Box::new(Expression::Identifier(Identifier("x".to_string()))),
+                        operator: Infix::LessThan,
+                        right: Box::new(Expression::Literal(Literal::Integer(10))),
+                    }),
+                    consequence: BlockStatement {
+                        statements: vec![
+                            Statement::Let {
+                                identifier: Identifier("y".to_string()),
+                                value: Expression::Literal(Literal::Integer(2)),
+                            },
+                            Statement::Continue,
+                        ],
+                    },
+                },
+            },
+            Test {
                 input: "while (x < 10) { y = y + 1; }",
                 expected: Expression::While {
                     condition: Box::new(Expression::Infix {

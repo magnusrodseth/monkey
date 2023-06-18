@@ -47,6 +47,8 @@ impl Evaluator {
             Statement::Expression(expression) => self.evaluate_expression(expression),
             Statement::Return(expression) => self.evaluate_return_statement(expression),
             Statement::Let { identifier, value } => self.evaluate_let_statement(identifier, value),
+            Statement::Break => Some(Object::Break),
+            Statement::Continue => Some(Object::Continue),
             _ => None,
         }
     }
@@ -56,6 +58,8 @@ impl Evaluator {
 
         for statement in block.statements {
             match self.evaluate_statement(statement) {
+                Some(Object::Break) => return Some(Object::Break),
+                Some(Object::Continue) => return Some(Object::Continue),
                 Some(Object::Return(object)) => return Some(Object::Return(object)),
                 Some(Object::Error(error)) => return Some(Object::Error(error)),
                 object => result = object,
@@ -504,6 +508,22 @@ impl Evaluator {
         let mut result = None;
 
         while let Some(condition) = self.evaluate_expression(*condition.clone()) {
+            if let Some(Object::Return(value)) = result {
+                return Some(Object::Return(value));
+            }
+
+            if let Some(Object::Error(_)) = result {
+                return result;
+            }
+
+            if let Some(Object::Break) = result {
+                return None;
+            }
+
+            if let Some(Object::Continue) = result {
+                result = None;
+            }
+
             if self.is_truthy(&condition) {
                 result = self.evaluate_block_statement(consequence.clone());
             } else {
@@ -1285,16 +1305,29 @@ mod tests {
 
     #[test]
     fn evaluate_while() {
-        let input = String::from(
-            r#"
-            let i = 0;
-            while (i < 10) {
-                i = i + 1;
-            }
-            i
-            "#,
-        );
+        struct Test {
+            input: &'static str,
+            expected: Object,
+        }
 
-        assert_eq!(evaluate(input), Some(Object::Integer(10)));
+        let tests = vec![
+            Test {
+                input: "let i = 0; while (i < 10) { i = i + 1; } i",
+                expected: Object::Integer(10),
+            },
+            Test {
+                input: "let i = 0; while (i < 10) { if (i == 5) { break; } i = i + 1; } i",
+                expected: Object::Integer(5),
+            },
+            Test {
+                input: "let i = 0; while (i < 10) { if (i == 3) { continue; } i = i + 1; } i",
+                expected: Object::Integer(9),
+            },
+        ];
+
+        for test in tests {
+            let evaluated = evaluate(String::from(test.input));
+            assert_eq!(evaluated, Some(test.expected));
+        }
     }
 }

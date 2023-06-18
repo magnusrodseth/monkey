@@ -1,6 +1,27 @@
 let i = 0;
-
+print("This will print from 1 to 10");
 while (i < 10) {
     i = i + 1;
+    print(i);
+}
+
+let i = 0;
+print("This will print from 1 to 5");
+while (i < 10) {
+    if (i == 5) {
+        break;
+    }
+    i = i + 1;
+    print(i);
+}
+
+
+let i = 0;
+print("This will skip 5");
+while (i < 10) {
+    i = i + 1;
+    if (i == 5) {
+        continue;
+    }
     print(i);
 }
