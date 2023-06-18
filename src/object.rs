@@ -9,6 +9,7 @@ type BuiltinFunction = fn(Vec<Object>) -> Object;
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum Object {
+    Identifier(Identifier),
     Integer(i64),
     Boolean(bool),
     String(String),
@@ -74,6 +75,7 @@ impl Display for Object {
             Object::Void => write!(f, ""),
             Object::Break => write!(f, ""),
             Object::Continue => write!(f, ""),
+            Object::Identifier(identifier) => write!(f, "{}", identifier),
         }
     }
 }

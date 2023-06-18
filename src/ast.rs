@@ -65,6 +65,10 @@ pub enum Expression {
         left: Box<Expression>,
         index: Box<Expression>,
     },
+    Assign {
+        identifier: Identifier,
+        value: Box<Expression>,
+    },
     Prefix {
         operator: Prefix,
         right: Box<Expression>,
@@ -90,6 +94,11 @@ pub enum Expression {
     Call {
         function: Box<Expression>,
         arguments: Vec<Expression>,
+    },
+    IndexAssign {
+        left: Box<Expression>,
+        index: Box<Expression>,
+        value: Box<Expression>,
     },
 }
 
@@ -200,6 +209,19 @@ impl Display for Expression {
             Expression::Index { left, index } => {
                 write!(f, "({}[{}])", left.to_string(), index.to_string())
             }
+            Expression::Assign {
+                identifier: left,
+                value: right,
+            } => {
+                write!(f, "({} = {})", left.to_string(), right.to_string())
+            }
+            Expression::IndexAssign { left, index, value } => write!(
+                f,
+                "({}[{}] = {})",
+                left.to_string(),
+                index.to_string(),
+                value.to_string()
+            ),
             Expression::While {
                 condition,
                 consequence,
@@ -271,6 +293,7 @@ pub struct Program {
 #[derive(Debug, PartialEq, Eq, PartialOrd, Clone)]
 pub enum Precedence {
     Lowest,
+    Assign,
     Equals,
     LessThanOrGreaterThan,
     Sum,

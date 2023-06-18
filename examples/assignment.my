@@ -1,0 +1,10 @@
+let x = 2;
+print("x is now ", x);
+
+let y = 3;
+print("y is now ", y);
+
+x = y * 2;
+print("after running x = y * 2, x is now ", x);
+
+
