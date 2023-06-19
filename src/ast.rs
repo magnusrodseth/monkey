@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt::Display};
+use std::fmt::Display;
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Clone)]
 pub struct Identifier(pub String);
@@ -86,6 +86,15 @@ pub enum Expression {
     While {
         condition: Box<Expression>,
         consequence: BlockStatement,
+    },
+    For {
+        identifier: Identifier,
+        iterator: Box<Expression>,
+        consequence: BlockStatement,
+    },
+    Range {
+        start: Box<Expression>,
+        end: Box<Expression>,
     },
     Function {
         parameters: Vec<Identifier>,
@@ -228,6 +237,16 @@ impl Display for Expression {
             } => {
                 write!(f, "while ({}) {}", condition, consequence)
             }
+            Expression::For {
+                identifier,
+                iterator,
+                consequence,
+            } => {
+                write!(f, "for {} in {} {}", identifier, iterator, consequence)
+            }
+            Expression::Range { start, end } => {
+                write!(f, "({}..{})", start.to_string(), end.to_string())
+            }
         }
     }
 }
@@ -294,6 +313,8 @@ pub struct Program {
 pub enum Precedence {
     Lowest,
     Assign,
+    Range,
+    In,
     Equals,
     LessThanOrGreaterThan,
     Sum,

@@ -110,6 +110,12 @@ impl Evaluator {
                 condition,
                 consequence,
             } => self.evaluate_while_expression(condition, consequence),
+            Expression::For {
+                identifier,
+                iterator,
+                consequence,
+            } => todo!(),
+            Expression::Range { start, end } => todo!(),
         }
     }
 
@@ -530,6 +536,10 @@ impl Evaluator {
         }
 
         result
+    }
+
+    fn evaluate_range_infix_expression(&self, left: i64, right: i64) -> Object {
+        todo!()
     }
 }
 

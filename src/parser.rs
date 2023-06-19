@@ -63,6 +63,8 @@ impl Parser {
             Token::LeftParenthesis => Precedence::Call,
             Token::LeftBracket => Precedence::Index,
             Token::Assign => Precedence::Assign,
+            Token::Range => Precedence::Range,
+            Token::In => Precedence::In,
             _ => Precedence::Lowest,
         }
     }
@@ -240,6 +242,7 @@ impl Parser {
             Token::If => self.parse_if_expression(),
             Token::Function => self.parse_function_literal(),
             Token::While => self.parse_while_expression(),
+            Token::For => self.parse_for_expression(),
             Token::LeftBrace => self.parse_hash_literal(),
             _ => {
                 self.errors.push(ParserError::new(
@@ -280,6 +283,10 @@ impl Parser {
                 Token::Assign => {
                     self.next_token();
                     left = self.parse_assign_expression(left.expect("Expected left expression"));
+                }
+                Token::Range => {
+                    self.next_token();
+                    left = self.parse_range_expression(left.expect("Expected left expression"));
                 }
                 _ => return left,
             }
@@ -626,6 +633,52 @@ impl Parser {
         Some(Expression::While {
             condition: Box::new(condition),
             consequence: body,
+        })
+    }
+
+    fn parse_for_expression(&mut self) -> Option<Expression> {
+        self.next_token();
+
+        let identifier = match self.parse_identifier() {
+            Some(identifier) => identifier,
+            None => return None,
+        };
+
+        if !self.peek_and_expect(Token::In) {
+            return None;
+        }
+
+        self.next_token();
+
+        let iterator = match self.parse_expression(Precedence::Lowest) {
+            Some(iterable) => iterable,
+            None => return None,
+        };
+
+        if !self.peek_and_expect(Token::LeftBrace) {
+            return None;
+        }
+
+        let body = self.parse_block_statement();
+
+        Some(Expression::For {
+            identifier,
+            iterator: Box::new(iterator),
+            consequence: body,
+        })
+    }
+
+    fn parse_range_expression(&mut self, start: Expression) -> Option<Expression> {
+        self.next_token();
+
+        let end = match self.parse_expression(Precedence::Lowest) {
+            Some(end) => end,
+            None => return None,
+        };
+
+        Some(Expression::Range {
+            start: Box::new(start),
+            end: Box::new(end),
         })
     }
 }
@@ -1581,6 +1634,78 @@ mod tests {
                     let statement = program.statements.first().unwrap();
 
                     pretty_assertions::assert_eq!(Statement::Expression(test.expected), *statement);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn parse_for_expression() {
+        struct Test {
+            input: &'static str,
+            expected: Expression,
+        }
+
+        let tests = vec![
+            Test {
+                input: "for i in 0..10 { let y = 2; }",
+                expected: Expression::For {
+                    identifier: Identifier("i".to_string()),
+                    iterator: Box::new(Expression::Range {
+                        start: Box::new(Expression::Literal(Literal::Integer(0))),
+                        end: Box::new(Expression::Literal(Literal::Integer(10))),
+                    }),
+                    consequence: BlockStatement {
+                        statements: vec![Statement::Let {
+                            identifier: Identifier("y".to_string()),
+                            value: Expression::Literal(Literal::Integer(2)),
+                        }],
+                    },
+                },
+            },
+            Test {
+                input: "for i in 0..10 { x = x + 1; break; }",
+                expected: Expression::For {
+                    identifier: Identifier("i".to_string()),
+                    iterator: Box::new(Expression::Range {
+                        start: Box::new(Expression::Literal(Literal::Integer(0))),
+                        end: Box::new(Expression::Literal(Literal::Integer(10))),
+                    }),
+                    consequence: BlockStatement {
+                        statements: vec![
+                            Statement::Expression(Expression::Assign {
+                                identifier: Identifier("x".to_string()),
+                                value: Box::new(Expression::Infix {
+                                    left: Box::new(Expression::Identifier(Identifier(
+                                        "x".to_string(),
+                                    ))),
+                                    operator: Infix::Plus,
+                                    right: Box::new(Expression::Literal(Literal::Integer(1))),
+                                }),
+                            }),
+                            Statement::Break,
+                        ],
+                    },
+                },
+            },
+        ];
+
+        for test in tests {
+            let lexer = Lexer::new(test.input.into());
+            let mut parser = Parser::new(lexer);
+            let program = parser.parse();
+
+            print_parser_errors!(parser.errors());
+
+            match program {
+                Err(_) => {
+                    panic!("Parser error");
+                }
+                Ok(program) => {
+                    assert_eq!(program.statements.len(), 1);
+                    let statement = program.statements.first().unwrap();
+
+                    assert_eq!(Statement::Expression(test.expected), *statement);
                 }
             }
         }
