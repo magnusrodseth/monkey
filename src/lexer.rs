@@ -57,6 +57,33 @@ impl Lexer {
         }
     }
 
+    fn handle_line_comment(&mut self) -> Token {
+        self.read_char();
+        while self.current_char != NEWLINE && self.current_char != EOF {
+            self.read_char();
+        }
+        self.next_token()
+    }
+
+    fn handle_block_comment(&mut self) -> Token {
+        self.read_char();
+        self.read_char();
+        while !(self.current_char == '*' && self.peek_char() == '/') {
+            self.read_char();
+        }
+        self.read_char();
+        self.read_char();
+        self.next_token()
+    }
+
+    fn handle_slash_or_comment(&mut self) -> Token {
+        match self.peek_char() {
+            '/' => self.handle_line_comment(),
+            '*' => self.handle_block_comment(),
+            _ => Token::Slash,
+        }
+    }
+
     pub fn next_token(&mut self) -> Token {
         self.skip_whitespace();
 
@@ -73,17 +100,7 @@ impl Lexer {
             '+' => Token::Plus,
             '-' => Token::Minus,
             '*' => Token::Asterisk,
-            '/' => {
-                if self.peek_char() == '/' {
-                    self.read_char();
-                    while self.current_char != NEWLINE && self.current_char != EOF {
-                        self.read_char();
-                    }
-                    self.next_token()
-                } else {
-                    Token::Slash
-                }
-            }
+            '/' => self.handle_slash_or_comment(),
             '!' => self.handle_peek('=', Token::NotEqual, Token::Bang),
             '<' => self.handle_peek('=', Token::LessThanOrEqual, Token::LessThan),
             '>' => self.handle_peek('=', Token::GreaterThanOrEqual, Token::GreaterThan),
@@ -203,7 +220,7 @@ mod tests {
     fn operators_delimiters() {
         let input = "
             =+(){},;
-            !-/*5;
+            !-/5;
             5 < 10 > 5;
         ";
 
@@ -219,7 +236,6 @@ mod tests {
             Token::Bang,
             Token::Minus,
             Token::Slash,
-            Token::Asterisk,
             Token::Integer(5),
             Token::Semicolon,
             Token::Integer(5),
@@ -373,6 +389,10 @@ mod tests {
         let input = r#"
             // This is a comment
             let five = 5;
+            /* This is a multiline comment
+               that spans multiple lines */
+            let ten = 10;
+            /* let commented_out = 5; */
         "#;
 
         let expected = vec![
@@ -381,6 +401,10 @@ mod tests {
             Token::Assign,
             Token::Integer(5),
             Token::Semicolon,
+            Token::Let,
+            Token::Identifier(String::from("ten")),
+            Token::Assign,
+            Token::Integer(10),
         ];
 
         assert_lexer_eq!(input, expected);
