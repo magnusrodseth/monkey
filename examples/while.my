@@ -4,6 +4,7 @@ while (i < 10) {
     i = i + 1;
     print(i);
 }
+print()
 
 let i = 0;
 print("This will print from 1 to 5");
@@ -14,6 +15,7 @@ while (i < 10) {
     i = i + 1;
     print(i);
 }
+print()
 
 
 let i = 0;
@@ -25,3 +27,4 @@ while (i < 10) {
     }
     print(i);
 }
+print()

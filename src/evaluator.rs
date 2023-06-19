@@ -441,17 +441,14 @@ impl Evaluator {
     }
 
     fn evaluate_assign_expression(&mut self, left: Identifier, right: Box<Expression>) -> Object {
-        let left = match left {
-            Identifier(identifier) => identifier,
-            _ => return self.error("invalid left-hand side of assignment".to_string()),
-        };
+        let Identifier(identifier) = left;
 
         let value = match self.evaluate_expression(*right) {
             Some(object) => object,
             _ => return NULL,
         };
 
-        self.environment.borrow_mut().set(left, value.clone());
+        self.environment.borrow_mut().set(identifier, value.clone());
 
         value
     }
@@ -517,11 +514,12 @@ impl Evaluator {
             }
 
             if let Some(Object::Break) = result {
-                return None;
+                break;
             }
 
             if let Some(Object::Continue) = result {
                 result = None;
+                continue;
             }
 
             if self.is_truthy(&condition) {
