@@ -31,6 +31,7 @@ pub enum Token {
     Equal,
     NotEqual,
     Range,
+    // TODO: Support range inclusive with '..='
 
     // Delimiters
     Comma,

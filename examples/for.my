@@ -1,0 +1,7 @@
+let result = 1;
+
+for i in 1..10 {
+  result = result * i;
+}
+
+print(result);

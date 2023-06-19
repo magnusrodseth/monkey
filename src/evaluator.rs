@@ -114,8 +114,8 @@ impl Evaluator {
                 identifier,
                 iterator,
                 consequence,
-            } => todo!(),
-            Expression::Range { start, end } => todo!(),
+            } => self.evaluate_for_expression(identifier, iterator, consequence),
+            Expression::Range { start, end } => Some(self.evaluate_range_expression(start, end)),
         }
     }
 
@@ -538,8 +538,112 @@ impl Evaluator {
         result
     }
 
-    fn evaluate_range_infix_expression(&self, left: i64, right: i64) -> Object {
-        todo!()
+    fn evaluate_range_expression(
+        &mut self,
+        start: Box<Expression>,
+        end: Box<Expression>,
+    ) -> Object {
+        let start = match self.evaluate_expression(*start) {
+            Some(object) => object,
+            _ => return NULL,
+        };
+
+        let end = match self.evaluate_expression(*end) {
+            Some(object) => object,
+            _ => return NULL,
+        };
+
+        match (start, end) {
+            (Object::Integer(start), Object::Integer(end)) => {
+                let mut elements = Vec::new();
+
+                for i in start..end {
+                    elements.push(Object::Integer(i));
+                }
+
+                Object::Array(elements)
+            }
+            // TODO: Support other types, e.g. char range
+            _ => NULL,
+        }
+    }
+
+    fn evaluate_for_expression(
+        &mut self,
+        identifier: Identifier,
+        iterator: Box<Expression>,
+        consequence: BlockStatement,
+    ) -> Option<Object> {
+        let Identifier(identifier) = identifier;
+
+        let iterator = match self.evaluate_expression(*iterator) {
+            Some(object) => object,
+            _ => return None,
+        };
+
+        match iterator {
+            Object::Array(elements) => {
+                let mut result = None;
+
+                for element in elements {
+                    self.environment
+                        .borrow_mut()
+                        .set(identifier.clone(), element);
+
+                    if let Some(Object::Return(value)) = result {
+                        return Some(Object::Return(value));
+                    }
+
+                    if let Some(Object::Error(_)) = result {
+                        return result;
+                    }
+
+                    if let Some(Object::Break) = result {
+                        break;
+                    }
+
+                    if let Some(Object::Continue) = result {
+                        result = None;
+                        continue;
+                    }
+
+                    result = self.evaluate_block_statement(consequence.clone());
+                }
+
+                result
+            }
+            Object::Hash(pairs) => {
+                let mut result = None;
+
+                for (key, value) in pairs {
+                    self.environment.borrow_mut().set(identifier.clone(), key);
+
+                    if let Some(Object::Return(value)) = result {
+                        return Some(Object::Return(value));
+                    }
+
+                    if let Some(Object::Error(_)) = result {
+                        return result;
+                    }
+
+                    if let Some(Object::Break) = result {
+                        break;
+                    }
+
+                    if let Some(Object::Continue) = result {
+                        result = None;
+                        continue;
+                    }
+
+                    self.environment.borrow_mut().set(identifier.clone(), value);
+
+                    result = self.evaluate_block_statement(consequence.clone());
+                }
+
+                result
+            }
+            _ => None,
+        }
     }
 }
 
@@ -548,6 +652,11 @@ mod tests {
     use crate::{environment::Environment, lexer::Lexer, parser::Parser};
 
     use super::*;
+
+    struct Test {
+        input: &'static str,
+        expected: Object,
+    }
 
     macro_rules! print_parser_errors {
         ($errors:expr) => {
@@ -1332,6 +1441,53 @@ mod tests {
             //     expected: Object::Integer(9),
             // },
         ];
+
+        for test in tests {
+            let evaluated = evaluate(String::from(test.input));
+            assert_eq!(evaluated, Some(test.expected));
+        }
+    }
+
+    #[test]
+    fn range() {
+        struct Test {
+            input: &'static str,
+            expected: Object,
+        }
+
+        let tests = vec![Test {
+            input: "0..10",
+            expected: Object::Array(vec![
+                Object::Integer(0),
+                Object::Integer(1),
+                Object::Integer(2),
+                Object::Integer(3),
+                Object::Integer(4),
+                Object::Integer(5),
+                Object::Integer(6),
+                Object::Integer(7),
+                Object::Integer(8),
+                Object::Integer(9),
+            ]),
+        }];
+
+        for test in tests {
+            let evaluated = evaluate(String::from(test.input));
+            assert_eq!(evaluated, Some(test.expected));
+        }
+    }
+
+    #[test]
+    fn evaluate_for() {
+        struct Test {
+            input: &'static str,
+            expected: Object,
+        }
+
+        let tests = vec![Test {
+            input: "let sum = 0; for i in 0..10 { sum = sum + i; } sum",
+            expected: Object::Integer(45),
+        }];
 
         for test in tests {
             let evaluated = evaluate(String::from(test.input));

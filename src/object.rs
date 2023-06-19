@@ -21,6 +21,11 @@ pub enum Object {
         body: BlockStatement,
         environment: Rc<RefCell<Environment>>,
     },
+    Range {
+        start: i64,
+        end: i64,
+        step: i64,
+    },
     Builtin(BuiltinFunction),
     Null,
     Break,
@@ -74,6 +79,9 @@ impl Display for Object {
             Object::Void => write!(f, ""),
             Object::Break => write!(f, ""),
             Object::Continue => write!(f, ""),
+            Object::Range { start, end, step } => {
+                write!(f, "range({}, {}, {})", start, end, step)
+            }
         }
     }
 }
